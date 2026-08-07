@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#1e6fff" />
+  <title>Ali Ayaan · Hero Times</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="sky" aria-hidden="true"></div>
+  <div class="burst" aria-hidden="true"></div>
+
+  <div id="app" class="app">
+    <!-- HOME -->
+    <section id="screen-home" class="screen active">
+      <header class="hero-brand">
+        <p class="eyebrow">Hero Times</p>
+        <h1>ALI AYAAN</h1>
+        <p class="tagline">Power up your multiplication!</p>
+      </header>
+
+      <div class="stats-strip" id="home-stats">
+        <div><span id="stat-stars">0</span> stars</div>
+        <div><span id="stat-streak">0</span> streak</div>
+        <div><span id="stat-level">1</span> level</div>
+      </div>
+
+      <form id="setup-form" class="setup">
+        <label>
+          Difficulty
+          <select id="difficulty" name="difficulty">
+            <option value="easy">Easy · tables 1–5</option>
+            <option value="medium" selected>Medium · tables 1–10</option>
+            <option value="hard">Hard · tables 1–12</option>
+            <option value="expert">Expert · tables 1–15</option>
+          </select>
+        </label>
+
+        <label>
+          Mission mode
+          <select id="mode" name="mode">
+            <option value="endless">Endless practice</option>
+            <option value="10">Fixed round · 10 questions</option>
+            <option value="20">Fixed round · 20 questions</option>
+            <option value="timed">Timed challenge · 60 seconds</option>
+          </select>
+        </label>
+
+        <label class="toggle-row">
+          <span>Shuffle questions</span>
+          <input type="checkbox" id="shuffle" checked />
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+
+        <button type="submit" class="btn primary big">Start Mission</button>
+      </form>
+
+      <nav class="home-nav">
+        <button type="button" class="btn secondary" data-go="map">Hero Map</button>
+        <button type="button" class="btn secondary" data-go="badges">Badges</button>
+        <button type="button" class="btn ghost" data-go="parent">Parent</button>
+      </nav>
+    </section>
+
+    <!-- PLAY -->
+    <section id="screen-play" class="screen">
+      <div class="play-top">
+        <button type="button" class="btn ghost small" id="btn-quit">Quit</button>
+        <div class="play-meta">
+          <span id="play-progress"></span>
+          <span id="play-timer" hidden></span>
+        </div>
+        <div class="play-score"><span id="play-stars">0</span> ★</div>
+      </div>
+
+      <div class="character-stage">
+        <div id="hero-avatar" class="hero-avatar" data-hero="spark">⚡</div>
+        <p id="hero-cheer" class="cheer">You got this!</p>
+      </div>
+
+      <div class="problem-card" id="problem-card">
+        <p class="problem" id="problem-text">3 × 4</p>
+        <form id="answer-form" autocomplete="off">
+          <label class="sr-only" for="answer">Your answer</label>
+          <input
+            id="answer"
+            name="answer"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            enterkeyhint="done"
+            maxlength="4"
+            placeholder="?"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+          <button type="submit" class="btn primary">POW!</button>
+        </form>
+        <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="streak-bar">
+        Streak <strong id="live-streak">0</strong>
+      </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section id="screen-results" class="screen">
+      <header class="hero-brand compact">
+        <h1 id="results-title">Mission Complete!</h1>
+        <p id="results-sub" class="tagline"></p>
+      </header>
+      <div class="results-grid" id="results-grid"></div>
+      <div class="actions">
+        <button type="button" class="btn primary big" data-go="home">Home Base</button>
+        <button type="button" class="btn secondary" id="btn-again">Play Again</button>
+      </div>
+    </section>
+
+    <!-- MAP -->
+    <section id="screen-map" class="screen">
+      <header class="hero-brand compact">
+        <h1>Hero Map</h1>
+        <p class="tagline">Conquer the multiplication tables</p>
+      </header>
+      <div id="map-grid" class="map-grid"></div>
+      <button type="button" class="btn secondary" data-go="home">Back</button>
+    </section>
+
+    <!-- BADGES -->
+    <section id="screen-badges" class="screen">
+      <header class="hero-brand compact">
+        <h1>Power Badges</h1>
+        <p class="tagline">Unlock heroes as you level up</p>
+      </header>
+      <div id="badge-grid" class="badge-grid"></div>
+      <button type="button" class="btn secondary" data-go="home">Back</button>
+    </section>
+
+    <!-- PARENT -->
+    <section id="screen-parent" class="screen">
+      <header class="hero-brand compact">
+        <h1>Parent Summary</h1>
+        <p class="tagline">Ali Ayaan’s training report</p>
+      </header>
+      <div id="parent-summary" class="parent-panel"></div>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="btn-reset">Reset progress</button>
+        <button type="button" class="btn secondary" data-go="home">Back</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="fx" class="fx" aria-hidden="true"></div>
+  <script src="app.js"></script>
+</body>
+</html>

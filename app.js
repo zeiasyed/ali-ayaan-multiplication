@@ -1,0 +1,602 @@
+(() => {
+  const STORAGE_KEY = "ali-ayaan-hero-times-v1";
+  const CHILD = "Ali Ayaan";
+  const MASTERY_STREAK = 5;
+
+  const DIFFICULTY = {
+    easy: 5,
+    medium: 10,
+    hard: 12,
+    expert: 15,
+  };
+
+  const HEROES = [
+    { id: "spark", icon: "⚡", name: "Spark Kid", need: 0 },
+    { id: "bolt", icon: "🦸", name: "Bolt Buddy", need: 25 },
+    { id: "cosmo", icon: "🌌", name: "Cosmo Cap", need: 75 },
+    { id: "flame", icon: "🔥", name: "Flame Fist", need: 150 },
+    { id: "nova", icon: "🌟", name: "Nova Knight", need: 300 },
+    { id: "legend", icon: "🏆", name: "Legend Ace", need: 500 },
+  ];
+
+  const BADGES = [
+    { id: "first", icon: "🎯", name: "First Pow", desc: "Get 1 correct answer", check: (s) => s.totalCorrect >= 1 },
+    { id: "streak5", icon: "🔥", name: "Hot Streak", desc: "Reach a streak of 5", check: (s) => s.bestStreak >= 5 },
+    { id: "streak10", icon: "💫", name: "Power 10", desc: "Reach a streak of 10", check: (s) => s.bestStreak >= 10 },
+    { id: "stars50", icon: "⭐", name: "Star Collector", desc: "Earn 50 stars", check: (s) => s.stars >= 50 },
+    { id: "stars200", icon: "🌠", name: "Galaxy Stars", desc: "Earn 200 stars", check: (s) => s.stars >= 200 },
+    { id: "table5", icon: "5️⃣", name: "Table Titan 5", desc: "Master the 5 times table", check: (s) => isTableMastered(s, 5) },
+    { id: "table10", icon: "🔟", name: "Table Titan 10", desc: "Master the 10 times table", check: (s) => isTableMastered(s, 10) },
+    { id: "missions5", icon: "🚀", name: "Mission Pro", desc: "Finish 5 missions", check: (s) => s.missionsCompleted >= 5 },
+  ];
+
+  const CHEERS = [
+    "You got this!",
+    "Hero mode!",
+    "Power punch!",
+    "Lightning brain!",
+    "Keep flying!",
+    "Super focus!",
+  ];
+
+  const WIN_LINES = [
+    "POW! Correct!",
+    "Boom! Nailed it!",
+    "Yes! Hero hit!",
+    "Zap! Perfect!",
+  ];
+
+  /** @type {ReturnType<typeof defaultState>} */
+  let state = loadState();
+  /** @type {null | {
+   *  difficulty: string,
+   *  mode: string,
+   *  shuffle: boolean,
+   *  max: number,
+   *  asked: number,
+   *  target: number | null,
+   *  correct: number,
+   *  firstTryCorrect: number,
+   *  attemptsOnCurrent: number,
+   *  sessionStars: number,
+   *  current: {a:number,b:number,key:string} | null,
+   *  ended: boolean,
+   *  timerId: number | null,
+   *  timeLeft: number,
+   * }} */
+  let session = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  function defaultState() {
+    return {
+      stars: 0,
+      streak: 0,
+      bestStreak: 0,
+      totalCorrect: 0,
+      totalAttempts: 0,
+      missionsCompleted: 0,
+      badges: {},
+      unlockedHeroes: { spark: true },
+      activeHero: "spark",
+      facts: {},
+      settings: {
+        difficulty: "medium",
+        mode: "endless",
+        shuffle: true,
+      },
+    };
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultState();
+      return { ...defaultState(), ...JSON.parse(raw) };
+    } catch {
+      return defaultState();
+    }
+  }
+
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function factKey(a, b) {
+    const x = Math.min(a, b);
+    const y = Math.max(a, b);
+    return `${x}x${y}`;
+  }
+
+  function ensureFact(key) {
+    if (!state.facts[key]) {
+      state.facts[key] = {
+        weight: 1,
+        correctStreak: 0,
+        wrongs: 0,
+        corrects: 0,
+        mastered: false,
+      };
+    }
+    return state.facts[key];
+  }
+
+  function isTableMastered(s, n) {
+    const maxOther = Math.max(DIFFICULTY.easy, ...Object.values(DIFFICULTY).filter(() => true));
+    // Master table n within 1..12 range for badge fairness
+    const limit = Math.min(12, maxOther);
+    for (let i = 1; i <= limit; i++) {
+      const f = s.facts[factKey(n, i)];
+      if (!f || !f.mastered) return false;
+    }
+    return true;
+  }
+
+  function levelFromStars(stars) {
+    return Math.floor(stars / 25) + 1;
+  }
+
+  function showScreen(name) {
+    document.querySelectorAll(".screen").forEach((el) => el.classList.remove("active"));
+    $(`screen-${name}`).classList.add("active");
+    if (name === "home") renderHome();
+    if (name === "map") renderMap();
+    if (name === "badges") renderBadges();
+    if (name === "parent") renderParent();
+  }
+
+  function renderHome() {
+    $("stat-stars").textContent = String(state.stars);
+    $("stat-streak").textContent = String(state.bestStreak);
+    $("stat-level").textContent = String(levelFromStars(state.stars));
+    $("difficulty").value = state.settings.difficulty;
+    $("mode").value = state.settings.mode;
+    $("shuffle").checked = !!state.settings.shuffle;
+    updateHeroAvatar();
+  }
+
+  function updateHeroAvatar() {
+    const hero = HEROES.find((h) => h.id === state.activeHero) || HEROES[0];
+    const el = $("hero-avatar");
+    if (el) {
+      el.dataset.hero = hero.id;
+      el.textContent = hero.icon;
+    }
+  }
+
+  function unlockRewards() {
+    for (const hero of HEROES) {
+      if (state.stars >= hero.need) state.unlockedHeroes[hero.id] = true;
+    }
+    const unlocked = HEROES.filter((h) => state.unlockedHeroes[h.id]);
+    state.activeHero = unlocked[unlocked.length - 1].id;
+
+    for (const badge of BADGES) {
+      if (!state.badges[badge.id] && badge.check(state)) {
+        state.badges[badge.id] = { earnedAt: Date.now() };
+      }
+    }
+  }
+
+  function buildPool(max) {
+    const pool = [];
+    for (let a = 1; a <= max; a++) {
+      for (let b = 1; b <= max; b++) {
+        const key = factKey(a, b);
+        const fact = ensureFact(key);
+        const weight = fact.mastered ? 0.35 : Math.max(1, fact.weight);
+        pool.push({ a, b, key, weight });
+      }
+    }
+    return pool;
+  }
+
+  function pickQuestion(max, shuffle) {
+    const pool = buildPool(max);
+    if (!shuffle) {
+      // Sequential-ish: prefer lower tables / unmastered, but still weight misses
+      pool.sort((x, y) => {
+        if (x.a !== y.a) return x.a - y.a;
+        return x.b - y.b;
+      });
+    }
+
+    // Avoid immediate repeat when possible
+    const filtered =
+      session?.current && pool.length > 1
+        ? pool.filter((p) => p.key !== session.current.key || p.weight > 3)
+        : pool;
+
+    const use = filtered.length ? filtered : pool;
+    const total = use.reduce((sum, p) => sum + p.weight, 0);
+    let r = Math.random() * total;
+    for (const p of use) {
+      r -= p.weight;
+      if (r <= 0) return { a: p.a, b: p.b, key: p.key };
+    }
+    const last = use[use.length - 1];
+    return { a: last.a, b: last.b, key: last.key };
+  }
+
+  function startMission(opts) {
+    stopTimer();
+    const max = DIFFICULTY[opts.difficulty] || 10;
+    const target =
+      opts.mode === "10" ? 10 : opts.mode === "20" ? 20 : opts.mode === "timed" ? null : null;
+
+    session = {
+      difficulty: opts.difficulty,
+      mode: opts.mode,
+      shuffle: opts.shuffle,
+      max,
+      asked: 0,
+      target: opts.mode === "10" || opts.mode === "20" ? Number(opts.mode) : null,
+      correct: 0,
+      firstTryCorrect: 0,
+      attemptsOnCurrent: 0,
+      sessionStars: 0,
+      current: null,
+      ended: false,
+      timerId: null,
+      timeLeft: 60,
+    };
+
+    state.settings = {
+      difficulty: opts.difficulty,
+      mode: opts.mode,
+      shuffle: opts.shuffle,
+    };
+    saveState();
+
+    $("play-stars").textContent = "0";
+    $("live-streak").textContent = String(state.streak);
+    $("feedback").textContent = "";
+    $("feedback").className = "feedback";
+    updateHeroAvatar();
+    $("hero-cheer").textContent = CHEERS[Math.floor(Math.random() * CHEERS.length)];
+
+    const timerEl = $("play-timer");
+    if (opts.mode === "timed") {
+      timerEl.hidden = false;
+      timerEl.textContent = "60s";
+      session.timerId = window.setInterval(() => {
+        session.timeLeft -= 1;
+        timerEl.textContent = `${session.timeLeft}s`;
+        if (session.timeLeft <= 0) endMission("Time’s up!");
+      }, 1000);
+    } else {
+      timerEl.hidden = true;
+    }
+
+    showScreen("play");
+    nextQuestion();
+  }
+
+  function stopTimer() {
+    if (session?.timerId) {
+      clearInterval(session.timerId);
+      session.timerId = null;
+    }
+  }
+
+  function nextQuestion() {
+    if (!session || session.ended) return;
+
+    if (session.target != null && session.asked >= session.target) {
+      endMission("Mission complete!");
+      return;
+    }
+
+    session.current = pickQuestion(session.max, session.shuffle);
+    session.attemptsOnCurrent = 0;
+    session.asked += 1;
+
+    $("problem-text").textContent = `${session.current.a} × ${session.current.b}`;
+    $("answer").value = "";
+    $("feedback").textContent = "";
+    $("feedback").className = "feedback";
+    $("problem-card").classList.remove("shake", "pop");
+
+    if (session.target != null) {
+      $("play-progress").textContent = `Q ${session.asked} / ${session.target}`;
+    } else if (session.mode === "timed") {
+      $("play-progress").textContent = `Solved ${session.correct}`;
+    } else {
+      $("play-progress").textContent = `Q ${session.asked}`;
+    }
+
+    $("answer").focus();
+  }
+
+  function onWrong() {
+    const card = $("problem-card");
+    card.classList.remove("shake");
+    void card.offsetWidth;
+    card.classList.add("shake");
+    $("feedback").textContent = "Not yet — try again!";
+    $("feedback").className = "feedback wrong";
+    $("hero-cheer").textContent = "Shake it off. Try once more!";
+
+    state.streak = 0;
+    $("live-streak").textContent = "0";
+
+    const fact = ensureFact(session.current.key);
+    if (session.attemptsOnCurrent === 1) {
+      // First miss on this prompt: bump frequency hard
+      fact.weight = Math.min(20, fact.weight + 4);
+      fact.correctStreak = 0;
+      fact.wrongs += 1;
+      fact.mastered = false;
+    } else {
+      fact.weight = Math.min(20, fact.weight + 1);
+    }
+    state.totalAttempts += 1;
+    saveState();
+  }
+
+  function onCorrect() {
+    const firstTry = session.attemptsOnCurrent === 1;
+    const fact = ensureFact(session.current.key);
+
+    fact.corrects += 1;
+    fact.correctStreak += 1;
+    if (fact.correctStreak >= MASTERY_STREAK) {
+      fact.mastered = true;
+      fact.weight = 0.5;
+    } else {
+      // Still reinforce until mastery, but ease a bit after success
+      fact.weight = Math.max(1, fact.weight - 1);
+    }
+
+    state.totalCorrect += 1;
+    state.totalAttempts += 1;
+    state.streak += 1;
+    state.bestStreak = Math.max(state.bestStreak, state.streak);
+
+    const starGain = firstTry ? 2 : 1;
+    state.stars += starGain;
+    session.sessionStars += starGain;
+    session.correct += 1;
+    if (firstTry) session.firstTryCorrect += 1;
+
+    unlockRewards();
+    saveState();
+
+    $("play-stars").textContent = String(session.sessionStars);
+    $("live-streak").textContent = String(state.streak);
+    $("feedback").textContent = WIN_LINES[Math.floor(Math.random() * WIN_LINES.length)];
+    $("feedback").className = "feedback right";
+    $("hero-cheer").textContent = fact.mastered
+      ? `${session.current.a}×${session.current.b} mastered!`
+      : CHEERS[Math.floor(Math.random() * CHEERS.length)];
+
+    const card = $("problem-card");
+    card.classList.remove("pop");
+    void card.offsetWidth;
+    card.classList.add("pop");
+    burstStars();
+
+    window.setTimeout(() => {
+      if (!session || session.ended) return;
+      nextQuestion();
+    }, 550);
+  }
+
+  function burstStars() {
+    const fx = $("fx");
+    for (let i = 0; i < 6; i++) {
+      const el = document.createElement("div");
+      el.className = "star-burst";
+      el.textContent = "★";
+      el.style.left = `${20 + Math.random() * 60}%`;
+      el.style.top = `${40 + Math.random() * 30}%`;
+      el.style.color = Math.random() > 0.5 ? "#e6392e" : "#ffc107";
+      fx.appendChild(el);
+      window.setTimeout(() => el.remove(), 900);
+    }
+  }
+
+  function endMission(title) {
+    if (!session || session.ended) return;
+    session.ended = true;
+    stopTimer();
+    state.missionsCompleted += 1;
+    unlockRewards();
+    saveState();
+
+    $("results-title").textContent = title;
+    $("results-sub").textContent = `${CHILD} powered through another mission.`;
+
+    const accuracy =
+      session.correct + (session.asked ? 0 : 0) === 0 && session.correct === 0
+        ? 0
+        : Math.round((session.firstTryCorrect / Math.max(1, session.correct)) * 100);
+
+    $("results-grid").innerHTML = `
+      <div class="stat-card"><strong>${session.sessionStars}</strong>stars earned</div>
+      <div class="stat-card"><strong>${session.correct}</strong>solved</div>
+      <div class="stat-card"><strong>${session.firstTryCorrect}</strong>first-try hits</div>
+      <div class="stat-card"><strong>${state.bestStreak}</strong>best streak</div>
+    `;
+
+    void accuracy;
+    showScreen("results");
+  }
+
+  function tableMasteryPercent(n, maxCheck) {
+    let done = 0;
+    const limit = maxCheck;
+    for (let i = 1; i <= limit; i++) {
+      const f = state.facts[factKey(n, i)];
+      if (f?.mastered) done += 1;
+    }
+    return Math.round((done / limit) * 100);
+  }
+
+  function renderMap() {
+    const max = DIFFICULTY[state.settings.difficulty] || 10;
+    const grid = $("map-grid");
+    grid.innerHTML = "";
+    for (let n = 1; n <= max; n++) {
+      const pct = tableMasteryPercent(n, max);
+      const cell = document.createElement("div");
+      cell.className = "map-cell";
+      if (pct >= 100) cell.classList.add("mastered");
+      else if (pct > 0) cell.classList.add("training");
+      else cell.classList.add("locked");
+      cell.innerHTML = `<span class="table-n">${n}s</span>${pct}%`;
+      grid.appendChild(cell);
+    }
+  }
+
+  function renderBadges() {
+    const grid = $("badge-grid");
+    grid.innerHTML = "";
+
+    for (const hero of HEROES) {
+      const unlocked = !!state.unlockedHeroes[hero.id];
+      const card = document.createElement("div");
+      card.className = `badge-card${unlocked ? "" : " locked"}`;
+      card.innerHTML = `
+        <span class="icon">${hero.icon}</span>
+        <h3>${hero.name}</h3>
+        <p>${unlocked ? "Unlocked hero" : `Need ${hero.need} stars`}</p>
+      `;
+      grid.appendChild(card);
+    }
+
+    for (const badge of BADGES) {
+      const earned = !!state.badges[badge.id];
+      const card = document.createElement("div");
+      card.className = `badge-card${earned ? "" : " locked"}`;
+      card.innerHTML = `
+        <span class="icon">${badge.icon}</span>
+        <h3>${badge.name}</h3>
+        <p>${badge.desc}</p>
+      `;
+      grid.appendChild(card);
+    }
+  }
+
+  function weakFacts(limit = 8) {
+    return Object.entries(state.facts)
+      .filter(([, f]) => f.wrongs > 0 || (!f.mastered && f.corrects + f.wrongs > 0))
+      .sort((a, b) => b[1].weight - a[1].weight || b[1].wrongs - a[1].wrongs)
+      .slice(0, limit);
+  }
+
+  function renderParent() {
+    const weak = weakFacts();
+    const mastered = Object.values(state.facts).filter((f) => f.mastered).length;
+    const accuracy =
+      state.totalAttempts === 0
+        ? 0
+        : Math.round((state.totalCorrect / state.totalAttempts) * 100);
+
+    $("parent-summary").innerHTML = `
+      <div class="parent-card">
+        <h3>Overview</h3>
+        <ul>
+          <li>Stars: ${state.stars}</li>
+          <li>Best streak: ${state.bestStreak}</li>
+          <li>Missions finished: ${state.missionsCompleted}</li>
+          <li>Facts mastered: ${mastered}</li>
+          <li>Lifetime accuracy: ${accuracy}%</li>
+          <li>Hero level: ${levelFromStars(state.stars)}</li>
+        </ul>
+      </div>
+      <div class="parent-card">
+        <h3>Needs more practice</h3>
+        ${
+          weak.length
+            ? `<ul>${weak
+                .map(([key, f]) => {
+                  const [a, b] = key.split("x");
+                  return `<li>${a} × ${b} · weight ${f.weight.toFixed(1)} · ${f.correctStreak}/${MASTERY_STREAK} streak</li>`;
+                })
+                .join("")}</ul>`
+            : "<p>No weak facts yet — start a mission!</p>"
+        }
+      </div>
+      <div class="parent-card">
+        <h3>How mastery works</h3>
+        <p style="margin:0;font-weight:700;color:var(--muted)">
+          Missed facts show up more often. A fact is mastered after ${MASTERY_STREAK} correct answers in a row.
+          Wrong answers must be retried until correct (no hint).
+        </p>
+      </div>
+    `;
+  }
+
+  // Events
+  $("setup-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    startMission({
+      difficulty: $("difficulty").value,
+      mode: $("mode").value,
+      shuffle: $("shuffle").checked,
+    });
+  });
+
+  $("answer-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!session || session.ended || !session.current) return;
+
+    const raw = $("answer").value.trim();
+    if (!/^\d+$/.test(raw)) {
+      $("feedback").textContent = "Type a number";
+      $("feedback").className = "feedback wrong";
+      return;
+    }
+
+    const guess = Number(raw);
+    const expected = session.current.a * session.current.b;
+    session.attemptsOnCurrent += 1;
+
+    if (guess === expected) onCorrect();
+    else {
+      onWrong();
+      $("answer").value = "";
+      $("answer").focus();
+    }
+  });
+
+  $("btn-quit").addEventListener("click", () => {
+    if (!session || session.ended) {
+      showScreen("home");
+      return;
+    }
+    if (confirm("Quit this mission?")) {
+      endMission("Mission paused");
+    }
+  });
+
+  $("btn-again").addEventListener("click", () => {
+    startMission({
+      difficulty: state.settings.difficulty,
+      mode: state.settings.mode,
+      shuffle: state.settings.shuffle,
+    });
+  });
+
+  $("btn-reset").addEventListener("click", () => {
+    if (!confirm("Reset all progress for Ali Ayaan?")) return;
+    state = defaultState();
+    saveState();
+    renderParent();
+    renderHome();
+  });
+
+  document.querySelectorAll("[data-go]").forEach((btn) => {
+    btn.addEventListener("click", () => showScreen(btn.getAttribute("data-go")));
+  });
+
+  // iPad: keep input usable
+  $("answer").addEventListener("focus", () => {
+    window.setTimeout(() => {
+      $("answer").scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 300);
+  });
+
+  renderHome();
+})();
