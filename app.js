@@ -579,13 +579,17 @@
     });
   });
 
-  $("btn-reset").addEventListener("click", () => {
+  function resetProgress() {
     if (!confirm("Reset all progress for Ali Ayaan?")) return;
     state = defaultState();
     saveState();
     renderParent();
     renderHome();
-  });
+    showScreen("home");
+  }
+
+  $("btn-reset").addEventListener("click", resetProgress);
+  $("btn-reset-results").addEventListener("click", resetProgress);
 
   document.querySelectorAll("[data-go]").forEach((btn) => {
     btn.addEventListener("click", () => showScreen(btn.getAttribute("data-go")));
