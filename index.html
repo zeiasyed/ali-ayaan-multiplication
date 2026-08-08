@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=11" />
+  <link rel="stylesheet" href="styles.css?v=12" />
 </head>
 <body>
   <div class="sky" aria-hidden="true"></div>
@@ -115,6 +115,12 @@
         </label>
 
         <label class="toggle-row">
+          <span>Say answers out loud</span>
+          <input type="checkbox" id="voice-mode" />
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+
+        <label class="toggle-row">
           <span>Shuffle questions</span>
           <input type="checkbox" id="shuffle" checked />
           <span class="switch" aria-hidden="true"></span>
@@ -164,8 +170,10 @@
             autocapitalize="off"
             spellcheck="false"
           />
+          <button type="button" class="btn mic" id="btn-mic" aria-label="Say the answer">🎤</button>
           <button type="submit" class="btn primary">POW!</button>
         </form>
+        <p id="voice-status" class="voice-status" aria-live="polite"></p>
         <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
       </div>
 
@@ -223,6 +231,6 @@
   </div>
 
   <div id="fx" class="fx" aria-hidden="true"></div>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

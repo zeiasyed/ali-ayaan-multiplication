@@ -87,8 +87,182 @@
    *  timeLeft: number,
    * }} */
   let session = null;
+  let speechRec = null;
+  let listening = false;
 
   const $ = (id) => document.getElementById(id);
+
+  const ONES = {
+    zero: 0, oh: 0, o: 0,
+    one: 1, two: 2, three: 3, four: 4, five: 5,
+    six: 6, seven: 7, eight: 8, nine: 9,
+    ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
+    fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+  };
+  const TENS = {
+    twenty: 20, thirty: 30, forty: 40, fifty: 50,
+    sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+  };
+
+  function parseSpokenNumber(text) {
+    if (!text) return null;
+    const cleaned = String(text)
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, " ")
+      .replace(/-/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const digitMatch = cleaned.match(/\b\d{1,4}\b/);
+    if (digitMatch) return Number(digitMatch[0]);
+
+    const words = cleaned.split(" ").filter(Boolean);
+    const skip = new Set([
+      "its", "it's", "is", "the", "answer", "equals", "equal", "to",
+      "um", "uh", "like", "just", "i", "think", "say", "said", "a", "an",
+    ]);
+    const tokens = words.filter((w) => !skip.has(w));
+    if (!tokens.length) return null;
+
+    let total = 0;
+    let current = 0;
+    let matched = false;
+    for (const w of tokens) {
+      if (ONES[w] != null) {
+        current += ONES[w];
+        matched = true;
+      } else if (TENS[w] != null) {
+        current += TENS[w];
+        matched = true;
+      } else if (w === "hundred") {
+        current = (current || 1) * 100;
+        matched = true;
+      } else if (w === "thousand") {
+        current = (current || 1) * 1000;
+        total += current;
+        current = 0;
+        matched = true;
+      }
+    }
+    total += current;
+    return matched ? total : null;
+  }
+
+  function speechSupported() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }
+
+  function setVoiceStatus(msg) {
+    const el = $("voice-status");
+    if (el) el.textContent = msg || "";
+  }
+
+  function setListeningUI(on) {
+    listening = on;
+    const btn = $("btn-mic");
+    if (btn) {
+      btn.classList.toggle("listening", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+  }
+
+  function stopListening() {
+    try {
+      speechRec?.stop();
+    } catch {
+      /* ignore */
+    }
+    setListeningUI(false);
+  }
+
+  function startListening() {
+    if (!speechSupported()) {
+      setVoiceStatus("Voice not supported here — try Safari or Chrome, or type the answer.");
+      return;
+    }
+    if (!session || session.ended || session.accepting === false) return;
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (speechRec) {
+      try {
+        speechRec.onresult = null;
+        speechRec.onerror = null;
+        speechRec.onend = null;
+        speechRec.abort();
+      } catch {
+        /* ignore */
+      }
+    }
+
+    speechRec = new SR();
+    speechRec.lang = "en-US";
+    speechRec.interimResults = false;
+    speechRec.maxAlternatives = 5;
+    speechRec.continuous = false;
+
+    setListeningUI(true);
+    setVoiceStatus("Listening… say the number");
+
+    speechRec.onresult = (event) => {
+      const alts = [];
+      for (let i = 0; i < event.results[0].length; i++) {
+        alts.push(event.results[0][i].transcript);
+      }
+      const transcript = alts[0] || "";
+      let value = null;
+      for (const t of alts) {
+        value = parseSpokenNumber(t);
+        if (value != null) break;
+      }
+
+      if (value == null) {
+        setVoiceStatus(`Heard “${transcript}” — say the number again`);
+        setListeningUI(false);
+        return;
+      }
+
+      setVoiceStatus(`Heard ${value}`);
+      $("answer").value = String(value);
+      submitAnswer(value);
+    };
+
+    speechRec.onerror = (event) => {
+      setListeningUI(false);
+      if (event.error === "not-allowed") {
+        setVoiceStatus("Microphone blocked — allow mic access for this site");
+      } else if (event.error === "no-speech") {
+        setVoiceStatus("Didn’t catch that — tap 🎤 and say it again");
+      } else if (event.error !== "aborted") {
+        setVoiceStatus("Couldn’t hear that — try again");
+      }
+    };
+
+    speechRec.onend = () => {
+      setListeningUI(false);
+    };
+
+    try {
+      speechRec.start();
+    } catch {
+      setListeningUI(false);
+      setVoiceStatus("Mic busy — tap 🎤 again");
+    }
+  }
+
+  function maybeAutoListen() {
+    if (!session || session.ended) return;
+    if (!(state.settings.voiceMode || $("voice-mode")?.checked)) return;
+    if (!speechSupported()) {
+      setVoiceStatus("Voice mode is on, but this browser can’t listen. Type the answer instead.");
+      return;
+    }
+    // Short delay so UI updates; if iPad blocks it, kid can tap 🎤
+    window.setTimeout(() => {
+      if (session && !session.ended && session.accepting !== false && !listening) {
+        startListening();
+      }
+    }, 300);
+  }
 
   function rangeTables(max) {
     return Array.from({ length: max }, (_, i) => i + 1);
@@ -124,6 +298,7 @@
         digitLevel: "single",
         mode: "endless",
         shuffle: true,
+        voiceMode: false,
         tables: rangeTables(10),
         problemType: "product",
       },
@@ -234,6 +409,7 @@
     if ($("mode")) $("mode").value = state.settings.mode;
     if ($("problem-type")) $("problem-type").value = state.settings.problemType || "product";
     if ($("shuffle")) $("shuffle").checked = !!state.settings.shuffle;
+    if ($("voice-mode")) $("voice-mode").checked = !!state.settings.voiceMode;
     renderTableChips();
     syncOperationUI();
     updateHeroAvatar();
@@ -456,7 +632,7 @@
     return {
       display: `${a} ${sym} ${b} = ${blank}`,
       expected: result,
-      hint: "Type the answer",
+      hint: "Type or say the answer",
     };
   }
 
@@ -498,6 +674,7 @@
       digitLevel,
       mode: opts.mode,
       shuffle: opts.shuffle,
+      voiceMode: !!opts.voiceMode,
       tables,
       problemType,
     };
@@ -507,6 +684,7 @@
     $("live-streak").textContent = String(state.streak);
     $("feedback").textContent = "";
     $("feedback").className = "feedback";
+    setVoiceStatus("");
     updateHeroAvatar();
     $("hero-cheer").textContent = CHEERS[Math.floor(Math.random() * CHEERS.length)];
 
@@ -568,11 +746,18 @@
     problemEl.textContent = session.current.display;
     problemEl.classList.toggle("equation", true);
     const hintEl = $("problem-hint");
-    if (hintEl) hintEl.textContent = session.current.hint || "";
+    if (hintEl) {
+      hintEl.textContent = state.settings.voiceMode
+        ? "Say the number out loud (or type it)"
+        : session.current.hint || "Type or say the answer";
+    }
     $("answer").value = "";
     $("feedback").textContent = "";
     $("feedback").className = "feedback";
     $("problem-card").classList.remove("shake", "pop");
+    stopListening();
+    setVoiceStatus(state.settings.voiceMode ? "Get ready…" : "");
+    maybeAutoListen();
 
     if (session.target != null) {
       $("play-progress").textContent = `Q ${session.asked} / ${session.target}`;
@@ -582,10 +767,11 @@
       $("play-progress").textContent = `Q ${session.asked}`;
     }
 
-    $("answer").focus();
+    if (!state.settings.voiceMode) $("answer").focus();
   }
 
   function onWrong() {
+    stopListening();
     const card = $("problem-card");
     card.classList.remove("shake");
     void card.offsetWidth;
@@ -609,9 +795,11 @@
     }
     state.totalAttempts += 1;
     saveState();
+    maybeAutoListen();
   }
 
   function onCorrect() {
+    stopListening();
     session.accepting = false;
     const firstTry = session.attemptsOnCurrent === 1;
     const fact = ensureFact(session.current.key);
@@ -677,10 +865,12 @@
   function endMission(title) {
     if (!session || session.ended) return;
     session.ended = true;
+    stopListening();
     stopTimer();
     state.missionsCompleted += 1;
     unlockRewards();
     saveState();
+    setVoiceStatus("");
 
     $("results-title").textContent = title;
     $("results-sub").textContent = `${CHILD} powered through another mission.`;
@@ -841,6 +1031,24 @@
     `;
   }
 
+  function submitAnswer(guess) {
+    if (!session || session.ended || !session.current) return;
+    if (session.accepting === false) return;
+
+    guess = Number(guess);
+    if (!Number.isFinite(guess)) return;
+
+    const expected = Number(session.current.expected);
+    session.attemptsOnCurrent += 1;
+
+    if (guess === expected) onCorrect();
+    else {
+      onWrong();
+      $("answer").value = "";
+      if (!state.settings.voiceMode) $("answer").focus();
+    }
+  }
+
   // Events
   $("setup-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -856,6 +1064,7 @@
       digitLevel: $("digit-level")?.value || "single",
       mode: $("mode")?.value || "endless",
       shuffle: !!$("shuffle")?.checked,
+      voiceMode: !!$("voice-mode")?.checked,
       tables,
       problemType: $("problem-type")?.value || "product",
     });
@@ -898,24 +1107,23 @@
     if (!session || session.ended || !session.current) return;
     if (session.accepting === false) return;
 
-    // Keep only digits (handles iPad keyboard quirks / spaces)
     const raw = String($("answer").value || "").replace(/[^\d]/g, "");
     if (!raw) {
-      $("feedback").textContent = "Type a number";
+      $("feedback").textContent = "Type a number or tap 🎤";
       $("feedback").className = "feedback wrong";
       return;
     }
 
-    const guess = Number(raw);
-    const expected = Number(session.current.expected);
-    session.attemptsOnCurrent += 1;
+    submitAnswer(Number(raw));
+  });
 
-    if (guess === expected) onCorrect();
-    else {
-      onWrong();
-      $("answer").value = "";
-      $("answer").focus();
+  $("btn-mic")?.addEventListener("click", () => {
+    if (listening) {
+      stopListening();
+      setVoiceStatus("Mic off");
+      return;
     }
+    startListening();
   });
 
   $("btn-quit").addEventListener("click", () => {
@@ -935,6 +1143,7 @@
       digitLevel: state.settings.digitLevel || "single",
       mode: state.settings.mode,
       shuffle: state.settings.shuffle,
+      voiceMode: !!state.settings.voiceMode,
       tables: state.settings.tables,
       problemType: state.settings.problemType || "product",
     });
