@@ -95,7 +95,9 @@
 
   const ONES = {
     zero: 0, oh: 0, o: 0,
-    one: 1, two: 2, three: 3, four: 4, five: 5,
+    one: 1, won: 1, juan: 1,
+    two: 2, too: 2,
+    three: 3, four: 4, five: 5,
     six: 6, seven: 7, eight: 8, nine: 9,
     ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
     fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
@@ -105,37 +107,86 @@
     sixty: 60, seventy: 70, eighty: 80, ninety: 90,
   };
 
-  function wordsToNumber(tokens) {
-    let total = 0;
-    let current = 0;
-    let matched = false;
-    for (const w of tokens) {
-      if (ONES[w] != null) {
-        current += ONES[w];
-        matched = true;
-      } else if (TENS[w] != null) {
-        current += TENS[w];
-        matched = true;
-      } else if (w === "hundred") {
-        current = (current || 1) * 100;
-        matched = true;
-      } else if (w === "thousand") {
-        current = (current || 1) * 1000;
-        total += current;
-        current = 0;
-        matched = true;
+  /** Pull separate number values: "twenty one" → [21], "eight one" → [8, 1] (never 9). */
+  function extractSpokenNumbers(tokens) {
+    const nums = [];
+    let i = 0;
+    while (i < tokens.length) {
+      const w = tokens[i];
+      if (/^\d{1,4}$/.test(w)) {
+        nums.push(Number(w));
+        i += 1;
+        continue;
       }
+      if (TENS[w] != null) {
+        let n = TENS[w];
+        const next = tokens[i + 1];
+        if (next && ONES[next] != null && ONES[next] < 10) {
+          n += ONES[next];
+          i += 2;
+        } else {
+          i += 1;
+        }
+        nums.push(n);
+        continue;
+      }
+      if (ONES[w] != null) {
+        let n = ONES[w];
+        if (tokens[i + 1] === "hundred") {
+          n *= 100;
+          i += 2;
+          const next = tokens[i];
+          if (next && TENS[next] != null) {
+            n += TENS[next];
+            i += 1;
+            const ones = tokens[i];
+            if (ones && ONES[ones] != null && ONES[ones] < 10) {
+              n += ONES[ones];
+              i += 1;
+            }
+          } else if (next && ONES[next] != null) {
+            n += ONES[next];
+            i += 1;
+          }
+        } else {
+          i += 1;
+        }
+        nums.push(n);
+        continue;
+      }
+      i += 1;
     }
-    total += current;
-    return matched ? total : null;
+    return nums;
   }
 
-  function parseSpokenNumber(text) {
+  function parseTailNumber(tail) {
+    if (!tail) return null;
+    const digitTail = tail.match(/\b\d{1,4}\b/);
+    if (digitTail) return Number(digitTail[0]);
+    const skip = new Set(["to", "the", "answer", "a", "an"]);
+    const tokens = tail.split(" ").filter(Boolean).filter((w) => !skip.has(w));
+    const nums = extractSpokenNumbers(tokens);
+    return nums.length ? nums[nums.length - 1] : null;
+  }
+
+  function looksLikeReadingFactors(nums, a, b) {
+    if (!nums || nums.length < 2) return false;
+    const factors = [Number(a), Number(b)].sort((x, y) => x - y);
+    const head = nums.slice(0, 2).slice().sort((x, y) => x - y);
+    return head[0] === factors[0] && head[1] === factors[1];
+  }
+
+  /**
+   * Parse a spoken answer. Uses the current problem so reading
+   * "one times one" / "eight one" does not overwrite the real answer.
+   */
+  function parseSpokenNumber(text, problem) {
     if (!text) return null;
     const cleaned = String(text)
       .toLowerCase()
       .replace(/×/g, " times ")
       .replace(/\*/g, " times ")
+      .replace(/\bby\b/g, " times ")
       .replace(/[^a-z0-9\s-]/g, " ")
       .replace(/-/g, " ")
       .replace(/\s+/g, " ")
@@ -143,43 +194,46 @@
 
     if (!cleaned) return null;
 
-    const opWords = /\b(times|multiplied|plus|minus|divided|over)\b/;
-    const hasOp = opWords.test(cleaned) || /\bx\b/.test(cleaned);
+    const hasOp =
+      /\b(times|multiplied|plus|minus|divided|over)\b/.test(cleaned) ||
+      /\bx\b/.test(cleaned);
 
-    // "eight times one equals eight" / "is 8" → take the answer after equals/is
-    const afterEquals = cleaned.split(/\b(?:equals|equal|is)\b/);
+    // "eight times one equals eight" / "is 8" → answer after equals/is
+    const afterEquals = cleaned.split(/\b(?:equals|equal|=|is)\b/);
     if (afterEquals.length > 1) {
-      const tail = afterEquals[afterEquals.length - 1].trim();
-      const digitTail = tail.match(/\b\d{1,4}\b/);
-      if (digitTail) return Number(digitTail[0]);
-      const tailWords = tail
-        .split(" ")
-        .filter(Boolean)
-        .filter((w) => !["to", "the", "answer", "a", "an"].includes(w));
-      const n = wordsToNumber(tailWords);
+      const n = parseTailNumber(afterEquals[afterEquals.length - 1].trim());
       if (n != null) return n;
     }
 
-    // Kid is reading the problem out loud ("eight times one") — ignore
+    // Kid is reading the problem out loud — ignore
     if (hasOp) return null;
 
-    // Single number: "8" or "twelve"
-    const onlyDigit = cleaned.match(/^\d{1,4}$/);
-    if (onlyDigit) return Number(onlyDigit[0]);
-
-    const words = cleaned.split(" ").filter(Boolean);
     const skip = new Set([
       "its", "it's", "the", "answer", "um", "uh", "like", "just",
       "i", "think", "say", "said", "a", "an", "to", "my",
     ]);
-    const tokens = words.filter((w) => !skip.has(w));
+    const tokens = cleaned.split(" ").filter(Boolean).filter((w) => !skip.has(w));
     if (!tokens.length) return null;
 
-    // Prefer a lone digit token if present ("the answer is 8" already handled)
-    const digitToken = tokens.find((w) => /^\d{1,4}$/.test(w));
-    if (digitToken && tokens.length <= 3) return Number(digitToken);
+    const nums = extractSpokenNumbers(tokens);
+    if (!nums.length) return null;
 
-    return wordsToNumber(tokens);
+    // "eight one" / "one one" without "times" = reading factors, not 9 or 2
+    if (problem && looksLikeReadingFactors(nums, problem.a, problem.b)) {
+      // Only accept if a clear third answer number is present and differs
+      if (nums.length >= 3) {
+        const last = nums[nums.length - 1];
+        const expected = Number(problem.expected);
+        if (last === expected) return last;
+      }
+      return null;
+    }
+
+    // Single clear number ("one", "8", "twelve")
+    if (nums.length === 1) return nums[0];
+
+    // Multiple unrelated numbers — take the last (often the answer)
+    return nums[nums.length - 1];
   }
 
   function choosePromptType(problemType, a, b, operation) {
@@ -275,17 +329,29 @@
 
       let value = null;
       for (const t of alts) {
-        value = parseSpokenNumber(t);
+        value = parseSpokenNumber(t, session?.current || null);
         if (value != null) break;
       }
 
       if (value == null) {
-        // Likely reading the problem aloud ("eight times one") — ignore
+        // Likely reading the problem aloud ("one times one") — ignore
+        return;
+      }
+
+      // Don't overwrite a typed correct answer with a bad mic guess
+      const box = $("answer");
+      const already = String(box?.value || "").replace(/[^\d]/g, "");
+      if (
+        already &&
+        session?.current &&
+        Number(already) === Number(session.current.expected) &&
+        value !== Number(session.current.expected)
+      ) {
         return;
       }
 
       // Fill the box only — kid hits POW to check
-      $("answer").value = String(value);
+      box.value = String(value);
       setVoiceStatus(`Got it: ${value} — hit POW!`);
     };
 
