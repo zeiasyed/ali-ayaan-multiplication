@@ -524,8 +524,7 @@ select, input[type="text"] {
 
 .results-grid,
 .parent-panel,
-.map-grid,
-.badge-grid {
+.map-grid {
   display: grid;
   gap: 0.65rem;
   margin-bottom: 1rem;
@@ -584,7 +583,24 @@ select, input[type="text"] {
 }
 
 .badge-grid {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.badge-universe {
+  margin: 0.4rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  letter-spacing: 0.04em;
+  color: var(--red);
+  text-shadow: 2px 2px 0 #fff;
+}
+
+.badge-universe-grid {
+  display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
 }
 
 .badge-card {

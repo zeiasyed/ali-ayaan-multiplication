@@ -11,12 +11,27 @@
   };
 
   const HEROES = [
-    { id: "spark", icon: "⚡", name: "Spark Kid", need: 0 },
-    { id: "bolt", icon: "🦸", name: "Bolt Buddy", need: 25 },
-    { id: "cosmo", icon: "🌌", name: "Cosmo Cap", need: 75 },
-    { id: "flame", icon: "🔥", name: "Flame Fist", need: 150 },
-    { id: "nova", icon: "🌟", name: "Nova Knight", need: 300 },
-    { id: "legend", icon: "🏆", name: "Legend Ace", need: 500 },
+    // Marvel first
+    { id: "spiderman", icon: "🕷️", name: "Spider-Man", need: 0, universe: "Marvel" },
+    { id: "ironman", icon: "🦾", name: "Iron Man", need: 25, universe: "Marvel" },
+    { id: "cap", icon: "🛡️", name: "Captain America", need: 50, universe: "Marvel" },
+    { id: "thor", icon: "⚡", name: "Thor", need: 75, universe: "Marvel" },
+    { id: "hulk", icon: "💪", name: "Hulk", need: 100, universe: "Marvel" },
+    { id: "blackpanther", icon: "🐆", name: "Black Panther", need: 130, universe: "Marvel" },
+    { id: "strange", icon: "🌀", name: "Doctor Strange", need: 160, universe: "Marvel" },
+    { id: "captainmarvel", icon: "⭐", name: "Captain Marvel", need: 200, universe: "Marvel" },
+    // Then Roblox
+    { id: "roblox-noob", icon: "🧱", name: "Noob", need: 240, universe: "Roblox" },
+    { id: "roblox-guest", icon: "👤", name: "Guest", need: 280, universe: "Roblox" },
+    { id: "roblox-builderman", icon: "🔧", name: "Builderman", need: 320, universe: "Roblox" },
+    { id: "roblox-bloxy", icon: "🏆", name: "Bloxy", need: 360, universe: "Roblox" },
+    { id: "roblox-bacon", icon: "🥓", name: "Bacon Hair", need: 400, universe: "Roblox" },
+    // Then Fortnite
+    { id: "fortnite-jonesy", icon: "🤠", name: "Jonesy", need: 450, universe: "Fortnite" },
+    { id: "fortnite-peely", icon: "🍌", name: "Peely", need: 500, universe: "Fortnite" },
+    { id: "fortnite-fishstick", icon: "🐟", name: "Fishstick", need: 560, universe: "Fortnite" },
+    { id: "fortnite-raven", icon: "🦅", name: "Raven", need: 620, universe: "Fortnite" },
+    { id: "fortnite-meowscles", icon: "🐱", name: "Meowscles", need: 700, universe: "Fortnite" },
   ];
 
   const BADGES = [
@@ -28,6 +43,9 @@
     { id: "table5", icon: "5️⃣", name: "Table Titan 5", desc: "Master the 5 times table", check: (s) => isTableMastered(s, 5) },
     { id: "table10", icon: "🔟", name: "Table Titan 10", desc: "Master the 10 times table", check: (s) => isTableMastered(s, 10) },
     { id: "missions5", icon: "🚀", name: "Mission Pro", desc: "Finish 5 missions", check: (s) => s.missionsCompleted >= 5 },
+    { id: "marvel-set", icon: "🦸", name: "Avenger Squad", desc: "Unlock all Marvel heroes", check: (s) => HEROES.filter((h) => h.universe === "Marvel").every((h) => s.unlockedHeroes[h.id]) },
+    { id: "roblox-set", icon: "🧱", name: "Roblox Crew", desc: "Unlock all Roblox heroes", check: (s) => HEROES.filter((h) => h.universe === "Roblox").every((h) => s.unlockedHeroes[h.id]) },
+    { id: "fortnite-set", icon: "🍌", name: "Victory Royale", desc: "Unlock all Fortnite heroes", check: (s) => HEROES.filter((h) => h.universe === "Fortnite").every((h) => s.unlockedHeroes[h.id]) },
   ];
 
   const CHEERS = [
@@ -97,8 +115,8 @@
       totalAttempts: 0,
       missionsCompleted: 0,
       badges: {},
-      unlockedHeroes: { spark: true },
-      activeHero: "spark",
+      unlockedHeroes: { spiderman: true },
+      activeHero: "spiderman",
       facts: {},
       settings: {
         operation: "multiply",
@@ -136,6 +154,15 @@
       merged.settings.tables = merged.settings.tables
         .map(Number)
         .filter((n) => n >= 1 && n <= 15);
+      // Migrate old starter hero id
+      if (merged.unlockedHeroes?.spark || merged.activeHero === "spark") {
+        merged.unlockedHeroes = { ...merged.unlockedHeroes, spiderman: true };
+        delete merged.unlockedHeroes.spark;
+        if (merged.activeHero === "spark") merged.activeHero = "spiderman";
+      }
+      if (!merged.unlockedHeroes?.spiderman) {
+        merged.unlockedHeroes = { ...merged.unlockedHeroes, spiderman: true };
+      }
       return merged;
     } catch {
       return defaultState();
@@ -704,18 +731,36 @@
     const grid = $("badge-grid");
     grid.innerHTML = "";
 
-    for (const hero of HEROES) {
-      const unlocked = !!state.unlockedHeroes[hero.id];
-      const card = document.createElement("div");
-      card.className = `badge-card${unlocked ? "" : " locked"}`;
-      card.innerHTML = `
-        <span class="icon">${hero.icon}</span>
-        <h3>${hero.name}</h3>
-        <p>${unlocked ? "Unlocked hero" : `Need ${hero.need} stars`}</p>
-      `;
-      grid.appendChild(card);
+    const universes = ["Marvel", "Roblox", "Fortnite"];
+    for (const universe of universes) {
+      const heading = document.createElement("h2");
+      heading.className = "badge-universe";
+      heading.textContent = universe;
+      grid.appendChild(heading);
+
+      const row = document.createElement("div");
+      row.className = "badge-universe-grid";
+      for (const hero of HEROES.filter((h) => h.universe === universe)) {
+        const unlocked = !!state.unlockedHeroes[hero.id];
+        const card = document.createElement("div");
+        card.className = `badge-card${unlocked ? "" : " locked"}`;
+        card.innerHTML = `
+          <span class="icon">${hero.icon}</span>
+          <h3>${hero.name}</h3>
+          <p>${unlocked ? "Unlocked hero" : `Need ${hero.need} stars`}</p>
+        `;
+        row.appendChild(card);
+      }
+      grid.appendChild(row);
     }
 
+    const badgeHeading = document.createElement("h2");
+    badgeHeading.className = "badge-universe";
+    badgeHeading.textContent = "Power Badges";
+    grid.appendChild(badgeHeading);
+
+    const badgeRow = document.createElement("div");
+    badgeRow.className = "badge-universe-grid";
     for (const badge of BADGES) {
       const earned = !!state.badges[badge.id];
       const card = document.createElement("div");
@@ -725,8 +770,9 @@
         <h3>${badge.name}</h3>
         <p>${badge.desc}</p>
       `;
-      grid.appendChild(card);
+      badgeRow.appendChild(card);
     }
+    grid.appendChild(badgeRow);
   }
 
   function weakFacts(limit = 8) {
