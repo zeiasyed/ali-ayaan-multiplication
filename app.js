@@ -49,7 +49,9 @@
   /** @type {ReturnType<typeof defaultState>} */
   let state = loadState();
   /** @type {null | {
+   *  operation: string,
    *  difficulty: string,
+   *  digitLevel: string,
    *  mode: string,
    *  shuffle: boolean,
    *  tables: number[],
@@ -74,6 +76,18 @@
     return Array.from({ length: max }, (_, i) => i + 1);
   }
 
+  function opSymbol(operation) {
+    if (operation === "add") return "+";
+    if (operation === "sub") return "−";
+    return "×";
+  }
+
+  function computeResult(a, b, operation) {
+    if (operation === "add") return a + b;
+    if (operation === "sub") return a - b;
+    return a * b;
+  }
+
   function defaultState() {
     return {
       stars: 0,
@@ -87,7 +101,9 @@
       activeHero: "spark",
       facts: {},
       settings: {
+        operation: "multiply",
         difficulty: "medium",
+        digitLevel: "single",
         mode: "endless",
         shuffle: true,
         tables: rangeTables(10),
@@ -130,7 +146,15 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  function factKey(a, b) {
+  function factKey(a, b, operation = "multiply") {
+    if (operation === "add") {
+      const x = Math.min(a, b);
+      const y = Math.max(a, b);
+      return `+:${x}+${y}`;
+    }
+    if (operation === "sub") {
+      return `-:${a}-${b}`;
+    }
     const x = Math.min(a, b);
     const y = Math.max(a, b);
     return `${x}x${y}`;
@@ -177,12 +201,58 @@
     $("stat-stars").textContent = String(state.stars);
     $("stat-streak").textContent = String(state.bestStreak);
     $("stat-level").textContent = String(levelFromStars(state.stars));
+    $("operation").value = state.settings.operation || "multiply";
     $("difficulty").value = state.settings.difficulty;
+    $("digit-level").value = state.settings.digitLevel || "single";
     $("mode").value = state.settings.mode;
     $("problem-type").value = state.settings.problemType || "product";
     $("shuffle").checked = !!state.settings.shuffle;
+    syncOperationUI();
     renderTableChips();
     updateHeroAvatar();
+  }
+
+  function syncOperationUI() {
+    const op = $("operation").value;
+    const isMult = op === "multiply";
+    $("difficulty-wrap").hidden = !isMult;
+    $("table-picker").hidden = !isMult;
+    $("digit-wrap").hidden = isMult;
+
+    const tag = $("home-tagline");
+    if (op === "add") tag.textContent = "Power up your addition!";
+    else if (op === "sub") tag.textContent = "Power up your subtraction!";
+    else tag.textContent = "Power up your multiplication!";
+
+    updateProblemTypeOptions(op);
+  }
+
+  function updateProblemTypeOptions(operation) {
+    const select = $("problem-type");
+    const current = select.value || state.settings.problemType || "product";
+    const sym = opSymbol(operation);
+    const samples =
+      operation === "add"
+        ? { a: 4, b: 3, r: 7 }
+        : operation === "sub"
+          ? { a: 12, b: 4, r: 8 }
+          : { a: 4, b: 3, r: 12 };
+
+    const options = [
+      ["product", `${samples.a} ${sym} ${samples.b} = ____`],
+      ["missing-b", `${samples.a} ${sym} ____ = ${samples.r}`],
+      ["missing-a", `____ ${sym} ${samples.b} = ${samples.r}`],
+      ["mix", "Mix all styles"],
+    ];
+
+    select.innerHTML = "";
+    for (const [value, label] of options) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = label;
+      select.appendChild(opt);
+    }
+    select.value = options.some(([v]) => v === current) ? current : "product";
   }
 
   function currentMax() {
@@ -245,30 +315,48 @@
     }
   }
 
-  function buildPool(max, tables) {
-    const focus = (tables && tables.length ? tables : rangeTables(max))
-      .map(Number)
-      .filter((n) => n >= 1 && n <= max);
+  function digitRange(digitLevel) {
+    if (digitLevel === "dual") return { min: 10, max: 99 };
+    return { min: 1, max: 9 };
+  }
+
+  function buildPool(operation, max, tables, digitLevel) {
     const pool = [];
     const seen = new Set();
 
-    for (const a of focus) {
-      for (let b = 1; b <= max; b++) {
-        const key = factKey(a, b);
-        if (seen.has(`${a}:${b}`)) continue;
-        seen.add(`${a}:${b}`);
-        const fact = ensureFact(key);
-        const weight = fact.mastered ? 0.35 : Math.max(1, fact.weight);
-        // Keep selected table as the first factor for clarity (7 × 3)
-        pool.push({ a, b, key, weight });
+    const pushPair = (a, b) => {
+      const id = `${a}:${b}`;
+      if (seen.has(id)) return;
+      seen.add(id);
+      const key = factKey(a, b, operation);
+      const fact = ensureFact(key);
+      const weight = fact.mastered ? 0.35 : Math.max(1, fact.weight);
+      pool.push({ a, b, key, weight });
+    };
+
+    if (operation === "multiply") {
+      const focus = (tables && tables.length ? tables : rangeTables(max))
+        .map(Number)
+        .filter((n) => n >= 1 && n <= max);
+      for (const a of focus) {
+        for (let b = 1; b <= max; b++) pushPair(a, b);
+      }
+      return pool;
+    }
+
+    const { min, max: hi } = digitRange(digitLevel || "single");
+    for (let a = min; a <= hi; a++) {
+      for (let b = min; b <= hi; b++) {
+        if (operation === "sub" && a < b) continue;
+        pushPair(a, b);
       }
     }
     return pool;
   }
 
-  function pickQuestion(max, shuffle, tables) {
-    const pool = buildPool(max, tables);
-    if (!pool.length) return { a: 1, b: 1, key: factKey(1, 1) };
+  function pickQuestion(operation, max, shuffle, tables, digitLevel) {
+    const pool = buildPool(operation, max, tables, digitLevel);
+    if (!pool.length) return { a: 1, b: 1, key: factKey(1, 1, operation) };
 
     if (!shuffle) {
       pool.sort((x, y) => {
@@ -301,29 +389,33 @@
     return problemType || "product";
   }
 
-  function formatProblem(a, b, promptType) {
-    const product = a * b;
+  function formatProblem(a, b, promptType, operation) {
+    const sym = opSymbol(operation);
+    const result = computeResult(a, b, operation);
+
     if (promptType === "missing-b") {
       return {
-        display: `${a} × ____ = ${product}`,
+        display: `${a} ${sym} ____ = ${result}`,
         expected: b,
       };
     }
     if (promptType === "missing-a") {
       return {
-        display: `____ × ${b} = ${product}`,
+        display: `____ ${sym} ${b} = ${result}`,
         expected: a,
       };
     }
     return {
-      display: `${a} × ${b} = ____`,
-      expected: product,
+      display: `${a} ${sym} ${b} = ____`,
+      expected: result,
     };
   }
 
   function startMission(opts) {
     stopTimer();
+    const operation = opts.operation || "multiply";
     const max = DIFFICULTY[opts.difficulty] || 10;
+    const digitLevel = opts.digitLevel || "single";
     let tables = (opts.tables || [])
       .map(Number)
       .filter((n) => n >= 1 && n <= max);
@@ -331,7 +423,9 @@
     const problemType = opts.problemType || "product";
 
     session = {
+      operation,
       difficulty: opts.difficulty,
+      digitLevel,
       mode: opts.mode,
       shuffle: opts.shuffle,
       tables,
@@ -350,7 +444,9 @@
     };
 
     state.settings = {
+      operation,
       difficulty: opts.difficulty,
+      digitLevel,
       mode: opts.mode,
       shuffle: opts.shuffle,
       tables,
@@ -397,9 +493,15 @@
       return;
     }
 
-    const picked = pickQuestion(session.max, session.shuffle, session.tables);
+    const picked = pickQuestion(
+      session.operation,
+      session.max,
+      session.shuffle,
+      session.tables,
+      session.digitLevel
+    );
     const promptType = choosePromptType(session.problemType);
-    const formatted = formatProblem(picked.a, picked.b, promptType);
+    const formatted = formatProblem(picked.a, picked.b, promptType, session.operation);
     session.current = {
       ...picked,
       promptType,
@@ -487,7 +589,7 @@
     $("feedback").textContent = WIN_LINES[Math.floor(Math.random() * WIN_LINES.length)];
     $("feedback").className = "feedback right";
     $("hero-cheer").textContent = fact.mastered
-      ? `${session.current.a}×${session.current.b} mastered!`
+      ? `${session.current.a}${opSymbol(session.operation)}${session.current.b} mastered!`
       : CHEERS[Math.floor(Math.random() * CHEERS.length)];
 
     const card = $("problem-card");
@@ -624,6 +726,17 @@
           <li>Lifetime accuracy: ${accuracy}%</li>
           <li>Hero level: ${levelFromStars(state.stars)}</li>
           <li>Focus tables: ${(state.settings.tables || []).map((n) => `${n}×`).join(", ") || "all"}</li>
+          <li>Skill: ${
+            state.settings.operation === "add"
+              ? "Addition"
+              : state.settings.operation === "sub"
+                ? "Subtraction"
+                : "Multiplication"
+          }${
+            state.settings.operation !== "multiply"
+              ? ` · ${state.settings.digitLevel === "dual" ? "dual digit" : "single digit"}`
+              : ""
+          }</li>
         </ul>
       </div>
       <div class="parent-card">
@@ -632,8 +745,12 @@
           weak.length
             ? `<ul>${weak
                 .map(([key, f]) => {
-                  const [a, b] = key.split("x");
-                  return `<li>${a} × ${b} · weight ${f.weight.toFixed(1)} · ${f.correctStreak}/${MASTERY_STREAK} streak</li>`;
+                  const pretty = key
+                    .replace(/^.:/, "")
+                    .replace("x", " × ")
+                    .replace("+", " + ")
+                    .replace("-", " − ");
+                  return `<li>${pretty} · weight ${f.weight.toFixed(1)} · ${f.correctStreak}/${MASTERY_STREAK} streak</li>`;
                 })
                 .join("")}</ul>`
             : "<p>No weak facts yet — start a mission!</p>"
@@ -652,18 +769,25 @@
   // Events
   $("setup-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    const tables = getSelectedTables();
-    if (!tables.length) {
+    const operation = $("operation").value;
+    const tables = operation === "multiply" ? getSelectedTables() : state.settings.tables || rangeTables(10);
+    if (operation === "multiply" && !tables.length) {
       alert("Pick at least one times table (like 2× or 7×).");
       return;
     }
     startMission({
+      operation,
       difficulty: $("difficulty").value,
+      digitLevel: $("digit-level").value,
       mode: $("mode").value,
       shuffle: $("shuffle").checked,
       tables,
       problemType: $("problem-type").value,
     });
+  });
+
+  $("operation").addEventListener("change", () => {
+    syncOperationUI();
   });
 
   $("difficulty").addEventListener("change", () => {
@@ -721,7 +845,9 @@
 
   $("btn-again").addEventListener("click", () => {
     startMission({
+      operation: state.settings.operation || "multiply",
       difficulty: state.settings.difficulty,
+      digitLevel: state.settings.digitLevel || "single",
       mode: state.settings.mode,
       shuffle: state.settings.shuffle,
       tables: state.settings.tables,
