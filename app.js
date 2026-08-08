@@ -242,9 +242,9 @@
           : { a: 4, b: 3, r: 12 };
 
     const options = [
-      ["product", `${samples.a} ${sym} ${samples.b} = ____`],
-      ["missing-b", `${samples.a} ${sym} ____ = ${samples.r}`],
-      ["missing-a", `____ ${sym} ${samples.b} = ${samples.r}`],
+      ["product", `${samples.a} ${sym} ${samples.b} = ?`],
+      ["missing-b", `${samples.a} ${sym} ? = ${samples.r}`],
+      ["missing-a", `? ${sym} ${samples.b} = ${samples.r}`],
       ["mix", "Mix all styles"],
     ];
 
@@ -339,6 +339,8 @@
     const seen = new Set();
 
     const pushPair = (a, b) => {
+      a = Number(a);
+      b = Number(b);
       const id = `${a}:${b}`;
       if (seen.has(id)) return;
       seen.add(id);
@@ -404,24 +406,30 @@
   }
 
   function formatProblem(a, b, promptType, operation) {
+    a = Number(a);
+    b = Number(b);
     const sym = opSymbol(operation);
-    const result = computeResult(a, b, operation);
+    const result = Number(computeResult(a, b, operation));
+    const blank = "?";
 
     if (promptType === "missing-b") {
       return {
-        display: `${a} ${sym} ____ = ${result}`,
+        display: `${a} ${sym} ${blank} = ${result}`,
         expected: b,
+        hint: "Fill in the missing number",
       };
     }
     if (promptType === "missing-a") {
       return {
-        display: `____ ${sym} ${b} = ${result}`,
+        display: `${blank} ${sym} ${b} = ${result}`,
         expected: a,
+        hint: "Fill in the missing number",
       };
     }
     return {
-      display: `${a} ${sym} ${b} = ____`,
+      display: `${a} ${sym} ${b} = ${blank}`,
       expected: result,
+      hint: "Type the answer",
     };
   }
 
@@ -518,16 +526,22 @@
     const formatted = formatProblem(picked.a, picked.b, promptType, session.operation);
     session.current = {
       ...picked,
+      a: Number(picked.a),
+      b: Number(picked.b),
       promptType,
-      expected: formatted.expected,
+      expected: Number(formatted.expected),
       display: formatted.display,
+      hint: formatted.hint,
     };
     session.attemptsOnCurrent = 0;
+    session.accepting = true;
     session.asked += 1;
 
     const problemEl = $("problem-text");
     problemEl.textContent = session.current.display;
     problemEl.classList.toggle("equation", true);
+    const hintEl = $("problem-hint");
+    if (hintEl) hintEl.textContent = session.current.hint || "";
     $("answer").value = "";
     $("feedback").textContent = "";
     $("feedback").className = "feedback";
@@ -571,6 +585,7 @@
   }
 
   function onCorrect() {
+    session.accepting = false;
     const firstTry = session.attemptsOnCurrent === 1;
     const fact = ensureFact(session.current.key);
 
@@ -835,16 +850,18 @@
   $("answer-form").addEventListener("submit", (e) => {
     e.preventDefault();
     if (!session || session.ended || !session.current) return;
+    if (session.accepting === false) return;
 
-    const raw = $("answer").value.trim();
-    if (!/^\d+$/.test(raw)) {
+    // Keep only digits (handles iPad keyboard quirks / spaces)
+    const raw = String($("answer").value || "").replace(/[^\d]/g, "");
+    if (!raw) {
       $("feedback").textContent = "Type a number";
       $("feedback").className = "feedback wrong";
       return;
     }
 
     const guess = Number(raw);
-    const expected = session.current.expected;
+    const expected = Number(session.current.expected);
     session.attemptsOnCurrent += 1;
 
     if (guess === expected) onCorrect();

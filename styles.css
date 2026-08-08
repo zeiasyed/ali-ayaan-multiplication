@@ -442,6 +442,13 @@ select, input[type="text"] {
   letter-spacing: 0.02em;
 }
 
+.problem-hint {
+  margin: -0.35rem 0 0.85rem;
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
 #answer-form {
   display: grid;
   grid-template-columns: 1fr auto;

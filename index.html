@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=10" />
 </head>
 <body>
   <div class="sky" aria-hidden="true"></div>
@@ -107,9 +107,9 @@
         <label>
           Problem type
           <select id="problem-type" name="problemType">
-            <option value="product" selected>4 × 3 = ____</option>
-            <option value="missing-b">4 × ____ = 12</option>
-            <option value="missing-a">____ × 3 = 12</option>
+            <option value="product" selected>4 × 3 = ?</option>
+            <option value="missing-b">4 × ? = 12</option>
+            <option value="missing-a">? × 3 = 12</option>
             <option value="mix">Mix all styles</option>
           </select>
         </label>
@@ -147,7 +147,8 @@
       </div>
 
       <div class="problem-card" id="problem-card">
-        <p class="problem" id="problem-text">3 × 4</p>
+        <p class="problem equation" id="problem-text">3 × 4 = ?</p>
+        <p class="problem-hint" id="problem-hint">Type the answer</p>
         <form id="answer-form" autocomplete="off">
           <label class="sr-only" for="answer">Your answer</label>
           <input
@@ -222,6 +223,6 @@
   </div>
 
   <div id="fx" class="fx" aria-hidden="true"></div>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>
