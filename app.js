@@ -203,9 +203,8 @@
     return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   }
 
-  function setVoiceStatus(msg) {
-    const el = $("voice-status");
-    if (el) el.textContent = msg || "";
+  function setVoiceStatus(_msg) {
+    // Keep the mic UI quiet — no rotating status text
   }
 
   function setListeningUI(on) {
@@ -214,7 +213,7 @@
     if (btn) {
       btn.classList.toggle("listening", on);
       btn.setAttribute("aria-pressed", on ? "true" : "false");
-      btn.textContent = on ? "Mic on — just talk" : "Mic paused — tap to listen";
+      btn.textContent = "Mic";
     }
   }
 
@@ -230,9 +229,6 @@
 
   function startListening() {
     if (!speechSupported()) {
-      setVoiceStatus("Voice not supported here — type the answer, then hit POW!");
-      const btn = $("btn-mic");
-      if (btn) btn.textContent = "Voice unavailable — type instead";
       return;
     }
     if (!session || session.ended || session.accepting === false || session.waitingNext) return;
@@ -950,7 +946,6 @@
 
     session.waitingNext = true;
     setPowLabel("NEXT!");
-    setVoiceStatus("Nice! Hit NEXT! to continue");
   }
 
   function burstStars() {
@@ -1234,7 +1229,6 @@
     if (session?.waitingNext) return;
     if (listening) {
       stopListening();
-      setVoiceStatus("Mic paused — tap to listen again");
       return;
     }
     startListening();
