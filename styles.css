@@ -222,24 +222,36 @@ select, input[type="text"] {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 0.45rem;
+  min-height: 3rem;
 }
 
 .table-chip {
   appearance: none;
+  -webkit-appearance: none;
   border: 3px solid var(--ink);
   border-radius: 12px;
   background: #fff;
-  min-height: 2.8rem;
+  min-height: 3rem;
   font-family: var(--font-body);
   font-weight: 900;
-  font-size: 1rem;
+  font-size: 1.05rem;
   color: var(--ink);
   cursor: pointer;
   box-shadow: 2px 2px 0 var(--ink);
+  touch-action: manipulation;
+}
+
+.table-chip[hidden] {
+  display: none !important;
 }
 
 .table-chip[aria-pressed="true"] {
   background: var(--gold);
+}
+
+.table-chip[aria-pressed="false"] {
+  background: #fff;
+  opacity: 0.72;
 }
 
 .table-chip:active {

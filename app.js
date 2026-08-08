@@ -201,34 +201,37 @@
     $("stat-stars").textContent = String(state.stars);
     $("stat-streak").textContent = String(state.bestStreak);
     $("stat-level").textContent = String(levelFromStars(state.stars));
-    $("operation").value = state.settings.operation || "multiply";
-    $("difficulty").value = state.settings.difficulty;
-    $("digit-level").value = state.settings.digitLevel || "single";
-    $("mode").value = state.settings.mode;
-    $("problem-type").value = state.settings.problemType || "product";
-    $("shuffle").checked = !!state.settings.shuffle;
-    syncOperationUI();
+    if ($("operation")) $("operation").value = state.settings.operation || "multiply";
+    if ($("difficulty")) $("difficulty").value = state.settings.difficulty;
+    if ($("digit-level")) $("digit-level").value = state.settings.digitLevel || "single";
+    if ($("mode")) $("mode").value = state.settings.mode;
+    if ($("problem-type")) $("problem-type").value = state.settings.problemType || "product";
+    if ($("shuffle")) $("shuffle").checked = !!state.settings.shuffle;
     renderTableChips();
+    syncOperationUI();
     updateHeroAvatar();
   }
 
   function syncOperationUI() {
-    const op = $("operation").value;
+    const op = $("operation")?.value || state.settings.operation || "multiply";
     const isMult = op === "multiply";
-    $("difficulty-wrap").hidden = !isMult;
-    $("table-picker").hidden = !isMult;
-    $("digit-wrap").hidden = isMult;
+    if ($("difficulty-wrap")) $("difficulty-wrap").hidden = !isMult;
+    if ($("table-picker")) $("table-picker").hidden = !isMult;
+    if ($("digit-wrap")) $("digit-wrap").hidden = isMult;
 
     const tag = $("home-tagline");
-    if (op === "add") tag.textContent = "Power up your addition!";
-    else if (op === "sub") tag.textContent = "Power up your subtraction!";
-    else tag.textContent = "Power up your multiplication!";
+    if (tag) {
+      if (op === "add") tag.textContent = "Power up your addition!";
+      else if (op === "sub") tag.textContent = "Power up your subtraction!";
+      else tag.textContent = "Power up your multiplication!";
+    }
 
     updateProblemTypeOptions(op);
   }
 
   function updateProblemTypeOptions(operation) {
     const select = $("problem-type");
+    if (!select) return;
     const current = select.value || state.settings.problemType || "product";
     const sym = opSymbol(operation);
     const samples =
@@ -260,36 +263,47 @@
   }
 
   function getSelectedTables() {
-    const chips = [...document.querySelectorAll(".table-chip[aria-pressed='true']")];
-    return chips.map((btn) => Number(btn.dataset.table)).filter(Boolean);
+    const max = currentMax();
+    return [...document.querySelectorAll(".table-chip[aria-pressed='true']")]
+      .map((btn) => Number(btn.dataset.table))
+      .filter((n) => n >= 1 && n <= max);
   }
 
   function renderTableChips() {
-    const max = currentMax();
     const host = $("table-chips");
-    const selected = new Set(
-      (state.settings.tables || [])
-        .map(Number)
-        .filter((n) => n >= 1 && n <= max)
-    );
-    if (!selected.size) {
-      rangeTables(max).forEach((n) => selected.add(n));
+    if (!host) return;
+
+    const max = currentMax();
+    let selected = (state.settings.tables || [])
+      .map(Number)
+      .filter((n) => n >= 1 && n <= max);
+    if (!selected.length) selected = rangeTables(max);
+    const selectedSet = new Set(selected);
+
+    const chips = [...host.querySelectorAll(".table-chip")];
+    if (!chips.length) {
+      // Fallback: build chips if HTML is empty / outdated cache
+      host.innerHTML = "";
+      for (let n = 1; n <= 15; n++) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "table-chip";
+        btn.dataset.table = String(n);
+        btn.textContent = `${n}×`;
+        host.appendChild(btn);
+      }
     }
 
-    host.innerHTML = "";
-    for (let n = 1; n <= max; n++) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "table-chip";
-      btn.dataset.table = String(n);
-      btn.textContent = `${n}×`;
-      btn.setAttribute("aria-pressed", selected.has(n) ? "true" : "false");
-      btn.addEventListener("click", () => {
-        const on = btn.getAttribute("aria-pressed") === "true";
-        btn.setAttribute("aria-pressed", on ? "false" : "true");
-      });
-      host.appendChild(btn);
-    }
+    host.querySelectorAll(".table-chip").forEach((btn) => {
+      const n = Number(btn.dataset.table);
+      const inRange = n >= 1 && n <= max;
+      btn.hidden = !inRange;
+      if (!inRange) {
+        btn.setAttribute("aria-pressed", "false");
+        return;
+      }
+      btn.setAttribute("aria-pressed", selectedSet.has(n) ? "true" : "false");
+    });
   }
 
   function updateHeroAvatar() {
@@ -767,9 +781,9 @@
   }
 
   // Events
-  $("setup-form").addEventListener("submit", (e) => {
+  $("setup-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
-    const operation = $("operation").value;
+    const operation = $("operation")?.value || "multiply";
     const tables = operation === "multiply" ? getSelectedTables() : state.settings.tables || rangeTables(10);
     if (operation === "multiply" && !tables.length) {
       alert("Pick at least one times table (like 2× or 7×).");
@@ -777,34 +791,42 @@
     }
     startMission({
       operation,
-      difficulty: $("difficulty").value,
-      digitLevel: $("digit-level").value,
-      mode: $("mode").value,
-      shuffle: $("shuffle").checked,
+      difficulty: $("difficulty")?.value || "medium",
+      digitLevel: $("digit-level")?.value || "single",
+      mode: $("mode")?.value || "endless",
+      shuffle: !!$("shuffle")?.checked,
       tables,
-      problemType: $("problem-type").value,
+      problemType: $("problem-type")?.value || "product",
     });
   });
 
-  $("operation").addEventListener("change", () => {
+  $("operation")?.addEventListener("change", () => {
     syncOperationUI();
   });
 
-  $("difficulty").addEventListener("change", () => {
+  $("difficulty")?.addEventListener("change", () => {
     const max = currentMax();
-    // Keep overlapping selections when difficulty changes
     state.settings.tables = getSelectedTables().filter((n) => n <= max);
     if (!state.settings.tables.length) state.settings.tables = rangeTables(max);
     renderTableChips();
   });
 
-  $("tables-all").addEventListener("click", () => {
+  $("table-chips")?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".table-chip");
+    if (!btn || btn.hidden) return;
+    e.preventDefault();
+    const on = btn.getAttribute("aria-pressed") === "true";
+    btn.setAttribute("aria-pressed", on ? "false" : "true");
+  });
+
+  $("tables-all")?.addEventListener("click", () => {
     document.querySelectorAll(".table-chip").forEach((btn) => {
+      if (btn.hidden) return;
       btn.setAttribute("aria-pressed", "true");
     });
   });
 
-  $("tables-none").addEventListener("click", () => {
+  $("tables-none")?.addEventListener("click", () => {
     document.querySelectorAll(".table-chip").forEach((btn) => {
       btn.setAttribute("aria-pressed", "false");
     });

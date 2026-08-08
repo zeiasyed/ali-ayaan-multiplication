@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
   <div class="sky" aria-hidden="true"></div>
@@ -70,12 +70,28 @@
 
         <fieldset class="table-picker" id="table-picker">
           <legend>Practice tables</legend>
-          <p class="table-hint">Pick which times tables to drill (e.g. 2×, 7×)</p>
+          <p class="table-hint">Tap the tables to practice (gold = on)</p>
           <div class="table-actions">
             <button type="button" class="btn-link" id="tables-all">All</button>
             <button type="button" class="btn-link" id="tables-none">None</button>
           </div>
-          <div id="table-chips" class="table-chips" role="group" aria-label="Times tables"></div>
+          <div id="table-chips" class="table-chips" role="group" aria-label="Times tables">
+            <button type="button" class="table-chip" data-table="1" aria-pressed="true">1×</button>
+            <button type="button" class="table-chip" data-table="2" aria-pressed="true">2×</button>
+            <button type="button" class="table-chip" data-table="3" aria-pressed="true">3×</button>
+            <button type="button" class="table-chip" data-table="4" aria-pressed="true">4×</button>
+            <button type="button" class="table-chip" data-table="5" aria-pressed="true">5×</button>
+            <button type="button" class="table-chip" data-table="6" aria-pressed="true">6×</button>
+            <button type="button" class="table-chip" data-table="7" aria-pressed="true">7×</button>
+            <button type="button" class="table-chip" data-table="8" aria-pressed="true">8×</button>
+            <button type="button" class="table-chip" data-table="9" aria-pressed="true">9×</button>
+            <button type="button" class="table-chip" data-table="10" aria-pressed="true">10×</button>
+            <button type="button" class="table-chip" data-table="11" aria-pressed="true">11×</button>
+            <button type="button" class="table-chip" data-table="12" aria-pressed="true">12×</button>
+            <button type="button" class="table-chip" data-table="13" aria-pressed="true">13×</button>
+            <button type="button" class="table-chip" data-table="14" aria-pressed="true">14×</button>
+            <button type="button" class="table-chip" data-table="15" aria-pressed="true">15×</button>
+          </div>
         </fieldset>
 
         <label>
@@ -206,6 +222,6 @@
   </div>
 
   <div id="fx" class="fx" aria-hidden="true"></div>
-  <script src="app.js"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
