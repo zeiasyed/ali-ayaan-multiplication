@@ -105,26 +105,7 @@
     sixty: 60, seventy: 70, eighty: 80, ninety: 90,
   };
 
-  function parseSpokenNumber(text) {
-    if (!text) return null;
-    const cleaned = String(text)
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, " ")
-      .replace(/-/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    const digitMatch = cleaned.match(/\b\d{1,4}\b/);
-    if (digitMatch) return Number(digitMatch[0]);
-
-    const words = cleaned.split(" ").filter(Boolean);
-    const skip = new Set([
-      "its", "it's", "is", "the", "answer", "equals", "equal", "to",
-      "um", "uh", "like", "just", "i", "think", "say", "said", "a", "an",
-    ]);
-    const tokens = words.filter((w) => !skip.has(w));
-    if (!tokens.length) return null;
-
+  function wordsToNumber(tokens) {
     let total = 0;
     let current = 0;
     let matched = false;
@@ -147,6 +128,75 @@
     }
     total += current;
     return matched ? total : null;
+  }
+
+  function parseSpokenNumber(text) {
+    if (!text) return null;
+    const cleaned = String(text)
+      .toLowerCase()
+      .replace(/×/g, " times ")
+      .replace(/\*/g, " times ")
+      .replace(/[^a-z0-9\s-]/g, " ")
+      .replace(/-/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!cleaned) return null;
+
+    const opWords = /\b(times|multiplied|plus|minus|divided|over)\b/;
+    const hasOp = opWords.test(cleaned) || /\bx\b/.test(cleaned);
+
+    // "eight times one equals eight" / "is 8" → take the answer after equals/is
+    const afterEquals = cleaned.split(/\b(?:equals|equal|is)\b/);
+    if (afterEquals.length > 1) {
+      const tail = afterEquals[afterEquals.length - 1].trim();
+      const digitTail = tail.match(/\b\d{1,4}\b/);
+      if (digitTail) return Number(digitTail[0]);
+      const tailWords = tail
+        .split(" ")
+        .filter(Boolean)
+        .filter((w) => !["to", "the", "answer", "a", "an"].includes(w));
+      const n = wordsToNumber(tailWords);
+      if (n != null) return n;
+    }
+
+    // Kid is reading the problem out loud ("eight times one") — ignore
+    if (hasOp) return null;
+
+    // Single number: "8" or "twelve"
+    const onlyDigit = cleaned.match(/^\d{1,4}$/);
+    if (onlyDigit) return Number(onlyDigit[0]);
+
+    const words = cleaned.split(" ").filter(Boolean);
+    const skip = new Set([
+      "its", "it's", "the", "answer", "um", "uh", "like", "just",
+      "i", "think", "say", "said", "a", "an", "to", "my",
+    ]);
+    const tokens = words.filter((w) => !skip.has(w));
+    if (!tokens.length) return null;
+
+    // Prefer a lone digit token if present ("the answer is 8" already handled)
+    const digitToken = tokens.find((w) => /^\d{1,4}$/.test(w));
+    if (digitToken && tokens.length <= 3) return Number(digitToken);
+
+    return wordsToNumber(tokens);
+  }
+
+  function choosePromptType(problemType, a, b, operation) {
+    let type = problemType || "product";
+    if (type === "mix") {
+      const kinds = ["product", "missing-b", "missing-a"];
+      type = kinds[Math.floor(Math.random() * kinds.length)];
+    }
+    // Avoid confusing prompts like 8 × ? = 8 (kids answer 8)
+    if (
+      operation === "multiply" &&
+      (type === "missing-a" || type === "missing-b") &&
+      (Number(a) === 1 || Number(b) === 1)
+    ) {
+      type = "product";
+    }
+    return type;
   }
 
   function speechSupported() {
@@ -210,17 +260,19 @@
     setVoiceStatus("Listening… say the number, then hit POW!");
 
     speechRec.onresult = (event) => {
-      // Prefer the latest final result; fall back to interim
+      // Only commit final phrases so interim babble doesn't overwrite typing
       let transcript = "";
       let isFinal = false;
       for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (!event.results[i].isFinal) continue;
         transcript = event.results[i][0].transcript;
-        isFinal = event.results[i].isFinal;
+        isFinal = true;
       }
+      if (!isFinal) return;
 
       const alts = [];
       const last = event.results[event.results.length - 1];
-      if (last) {
+      if (last && last.isFinal) {
         for (let i = 0; i < last.length; i++) alts.push(last[i].transcript);
       }
       if (!alts.length && transcript) alts.push(transcript);
@@ -232,9 +284,7 @@
       }
 
       if (value == null) {
-        if (isFinal && transcript) {
-          setVoiceStatus(`Heard “${transcript.trim()}” — say the number clearly`);
-        }
+        // Likely reading the problem aloud ("eight times one") — ignore
         return;
       }
 
@@ -657,14 +707,6 @@
     return { a: last.a, b: last.b, key: last.key };
   }
 
-  function choosePromptType(problemType) {
-    if (problemType === "mix") {
-      const kinds = ["product", "missing-b", "missing-a"];
-      return kinds[Math.floor(Math.random() * kinds.length)];
-    }
-    return problemType || "product";
-  }
-
   function formatProblem(a, b, promptType, operation) {
     a = Number(a);
     b = Number(b);
@@ -785,7 +827,12 @@
       session.tables,
       session.digitLevel
     );
-    const promptType = choosePromptType(session.problemType);
+    const promptType = choosePromptType(
+      session.problemType,
+      picked.a,
+      picked.b,
+      session.operation
+    );
     const formatted = formatProblem(picked.a, picked.b, promptType, session.operation);
     session.current = {
       ...picked,
