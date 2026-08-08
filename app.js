@@ -231,7 +231,7 @@
       if (event.error === "not-allowed") {
         setVoiceStatus("Microphone blocked — allow mic access for this site");
       } else if (event.error === "no-speech") {
-        setVoiceStatus("Didn’t catch that — tap 🎤 and say it again");
+        setVoiceStatus("Didn’t catch that — tap SAY IT again");
       } else if (event.error !== "aborted") {
         setVoiceStatus("Couldn’t hear that — try again");
       }
@@ -245,7 +245,7 @@
       speechRec.start();
     } catch {
       setListeningUI(false);
-      setVoiceStatus("Mic busy — tap 🎤 again");
+      setVoiceStatus("Mic busy — tap SAY IT again");
     }
   }
 
@@ -747,7 +747,7 @@
     problemEl.classList.toggle("equation", true);
     const hintEl = $("problem-hint");
     if (hintEl) {
-      hintEl.textContent = "Type it or tap 🎤 and say it";
+      hintEl.textContent = "Type it below — or tap SAY IT and speak";
     }
     $("answer").value = "";
     $("feedback").textContent = "";
@@ -1108,7 +1108,7 @@
 
     const raw = String($("answer").value || "").replace(/[^\d]/g, "");
     if (!raw) {
-      $("feedback").textContent = "Type a number or tap 🎤";
+      $("feedback").textContent = "Type a number or tap SAY IT";
       $("feedback").className = "feedback wrong";
       return;
     }

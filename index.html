@@ -10,7 +10,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=13" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <link rel="stylesheet" href="styles.css?v=14" />
 </head>
 <body>
   <div class="sky" aria-hidden="true"></div>
@@ -125,7 +128,7 @@
           <input type="checkbox" id="shuffle" checked />
           <span class="switch" aria-hidden="true"></span>
         </label>
-        <p class="setup-note">Answers can always be typed or spoken with 🎤</p>
+        <p class="setup-note">During play: type the answer OR tap the big SAY IT button</p>
 
         <button type="submit" class="btn primary big">Start Mission</button>
       </form>
@@ -155,24 +158,28 @@
 
       <div class="problem-card" id="problem-card">
         <p class="problem equation" id="problem-text">3 × 4 = ?</p>
-        <p class="problem-hint" id="problem-hint">Type it or tap 🎤 and say it</p>
+        <p class="problem-hint" id="problem-hint">Type it below — or tap SAY IT and speak</p>
         <form id="answer-form" autocomplete="off">
           <label class="sr-only" for="answer">Your answer</label>
-          <input
-            id="answer"
-            name="answer"
-            type="text"
-            inputmode="numeric"
-            pattern="[0-9]*"
-            enterkeyhint="done"
-            maxlength="5"
-            placeholder="?"
-            autocomplete="off"
-            autocapitalize="off"
-            spellcheck="false"
-          />
-          <button type="button" class="btn mic" id="btn-mic" aria-label="Say the answer">🎤</button>
-          <button type="submit" class="btn primary">POW!</button>
+          <div class="answer-row">
+            <input
+              id="answer"
+              name="answer"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              enterkeyhint="done"
+              maxlength="5"
+              placeholder="Type here"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+            />
+            <button type="submit" class="btn primary">POW!</button>
+          </div>
+          <button type="button" class="btn say-it" id="btn-mic" aria-label="Say the answer out loud">
+            SAY IT
+          </button>
         </form>
         <p id="voice-status" class="voice-status" aria-live="polite"></p>
         <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
@@ -232,6 +239,6 @@
   </div>
 
   <div id="fx" class="fx" aria-hidden="true"></div>
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
