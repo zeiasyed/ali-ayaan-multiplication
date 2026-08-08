@@ -13,7 +13,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <link rel="stylesheet" href="styles.css?v=14" />
+  <link rel="stylesheet" href="styles.css?v=15" />
 </head>
 <body>
   <div class="sky" aria-hidden="true"></div>
@@ -128,7 +128,7 @@
           <input type="checkbox" id="shuffle" checked />
           <span class="switch" aria-hidden="true"></span>
         </label>
-        <p class="setup-note">During play: type the answer OR tap the big SAY IT button</p>
+        <p class="setup-note">During play the mic listens automatically. Say or type the answer, then hit POW!</p>
 
         <button type="submit" class="btn primary big">Start Mission</button>
       </form>
@@ -158,7 +158,7 @@
 
       <div class="problem-card" id="problem-card">
         <p class="problem equation" id="problem-text">3 × 4 = ?</p>
-        <p class="problem-hint" id="problem-hint">Type it below — or tap SAY IT and speak</p>
+        <p class="problem-hint" id="problem-hint">Say it or type it — then hit POW!</p>
         <form id="answer-form" autocomplete="off">
           <label class="sr-only" for="answer">Your answer</label>
           <div class="answer-row">
@@ -175,10 +175,10 @@
               autocapitalize="off"
               spellcheck="false"
             />
-            <button type="submit" class="btn primary">POW!</button>
+            <button type="submit" class="btn primary" id="btn-pow">POW!</button>
           </div>
-          <button type="button" class="btn say-it" id="btn-mic" aria-label="Say the answer out loud">
-            SAY IT
+          <button type="button" class="btn say-it" id="btn-mic" aria-label="Microphone status">
+            Listening…
           </button>
         </form>
         <p id="voice-status" class="voice-status" aria-live="polite"></p>
@@ -239,6 +239,6 @@
   </div>
 
   <div id="fx" class="fx" aria-hidden="true"></div>
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

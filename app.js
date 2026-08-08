@@ -89,6 +89,7 @@
   let session = null;
   let speechRec = null;
   let listening = false;
+  let wantListen = false;
 
   const $ = (id) => document.getElementById(id);
 
@@ -163,12 +164,14 @@
     if (btn) {
       btn.classList.toggle("listening", on);
       btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.textContent = on ? "Listening… just talk" : "Mic paused — tap to listen";
     }
   }
 
-  function stopListening() {
+  function stopListening(clearWant = true) {
+    if (clearWant) wantListen = false;
     try {
-      speechRec?.stop();
+      speechRec?.abort();
     } catch {
       /* ignore */
     }
@@ -177,10 +180,12 @@
 
   function startListening() {
     if (!speechSupported()) {
-      setVoiceStatus("Voice not supported here — try Safari or Chrome, or type the answer.");
+      setVoiceStatus("Voice not supported here — type the answer, then hit POW!");
+      const btn = $("btn-mic");
+      if (btn) btn.textContent = "Voice unavailable — type instead";
       return;
     }
-    if (!session || session.ended || session.accepting === false) return;
+    if (!session || session.ended || session.accepting === false || session.waitingNext) return;
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (speechRec) {
@@ -194,21 +199,32 @@
       }
     }
 
+    wantListen = true;
     speechRec = new SR();
     speechRec.lang = "en-US";
-    speechRec.interimResults = false;
+    speechRec.interimResults = true;
     speechRec.maxAlternatives = 5;
-    speechRec.continuous = false;
+    speechRec.continuous = true;
 
     setListeningUI(true);
-    setVoiceStatus("Listening… say the number");
+    setVoiceStatus("Listening… say the number, then hit POW!");
 
     speechRec.onresult = (event) => {
-      const alts = [];
-      for (let i = 0; i < event.results[0].length; i++) {
-        alts.push(event.results[0][i].transcript);
+      // Prefer the latest final result; fall back to interim
+      let transcript = "";
+      let isFinal = false;
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript = event.results[i][0].transcript;
+        isFinal = event.results[i].isFinal;
       }
-      const transcript = alts[0] || "";
+
+      const alts = [];
+      const last = event.results[event.results.length - 1];
+      if (last) {
+        for (let i = 0; i < last.length; i++) alts.push(last[i].transcript);
+      }
+      if (!alts.length && transcript) alts.push(transcript);
+
       let value = null;
       for (const t of alts) {
         value = parseSpokenNumber(t);
@@ -216,52 +232,79 @@
       }
 
       if (value == null) {
-        setVoiceStatus(`Heard “${transcript}” — say the number again`);
-        setListeningUI(false);
+        if (isFinal && transcript) {
+          setVoiceStatus(`Heard “${transcript.trim()}” — say the number clearly`);
+        }
         return;
       }
 
-      setVoiceStatus(`Heard ${value}`);
+      // Fill the box only — kid hits POW to check
       $("answer").value = String(value);
-      submitAnswer(value);
+      setVoiceStatus(`Got it: ${value} — hit POW!`);
     };
 
     speechRec.onerror = (event) => {
-      setListeningUI(false);
       if (event.error === "not-allowed") {
-        setVoiceStatus("Microphone blocked — allow mic access for this site");
-      } else if (event.error === "no-speech") {
-        setVoiceStatus("Didn’t catch that — tap SAY IT again");
-      } else if (event.error !== "aborted") {
-        setVoiceStatus("Couldn’t hear that — try again");
+        wantListen = false;
+        setListeningUI(false);
+        setVoiceStatus("Microphone blocked — allow mic access, or just type");
+        return;
+      }
+      if (event.error === "no-speech") {
+        // Keep trying — onend will restart
+        return;
+      }
+      if (event.error !== "aborted") {
+        setVoiceStatus("Couldn’t hear that — say it again or type it");
       }
     };
 
     speechRec.onend = () => {
       setListeningUI(false);
+      if (
+        wantListen &&
+        session &&
+        !session.ended &&
+        session.accepting !== false &&
+        !session.waitingNext
+      ) {
+        window.setTimeout(() => {
+          if (wantListen && session && session.accepting && !session.waitingNext) {
+            startListening();
+          }
+        }, 250);
+      }
     };
 
     try {
       speechRec.start();
     } catch {
       setListeningUI(false);
-      setVoiceStatus("Mic busy — tap SAY IT again");
+      setVoiceStatus("Mic restarting…");
+      window.setTimeout(() => {
+        if (wantListen) startListening();
+      }, 400);
     }
   }
 
   function maybeAutoListen() {
-    if (!session || session.ended) return;
-    if (!(state.settings.voiceMode || $("voice-mode")?.checked)) return;
+    if (!session || session.ended || session.waitingNext) return;
+    if (session.accepting === false) return;
+    // Always listen during play so kids don't need to tap the mic
     if (!speechSupported()) {
-      setVoiceStatus("Voice mode is on, but this browser can’t listen. Type the answer instead.");
+      setVoiceStatus("Type your answer, then hit POW!");
       return;
     }
-    // Short delay so UI updates; if iPad blocks it, kid can tap 🎤
     window.setTimeout(() => {
-      if (session && !session.ended && session.accepting !== false && !listening) {
+      if (session && !session.ended && session.accepting && !session.waitingNext) {
         startListening();
       }
-    }, 300);
+    }, 200);
+  }
+
+  function setPowLabel(text) {
+    const btn = $("btn-pow");
+    if (btn) btn.textContent = text;
   }
 
   function rangeTables(max) {
@@ -664,6 +707,7 @@
       sessionStars: 0,
       current: null,
       ended: false,
+      waitingNext: false,
       timerId: null,
       timeLeft: 60,
     };
@@ -740,6 +784,7 @@
     };
     session.attemptsOnCurrent = 0;
     session.accepting = true;
+    session.waitingNext = false;
     session.asked += 1;
 
     const problemEl = $("problem-text");
@@ -747,12 +792,13 @@
     problemEl.classList.toggle("equation", true);
     const hintEl = $("problem-hint");
     if (hintEl) {
-      hintEl.textContent = "Type it below — or tap SAY IT and speak";
+      hintEl.textContent = "Say it or type it — then hit POW!";
     }
     $("answer").value = "";
     $("feedback").textContent = "";
     $("feedback").className = "feedback";
     $("problem-card").classList.remove("shake", "pop");
+    setPowLabel("POW!");
     stopListening();
     setVoiceStatus("");
     maybeAutoListen();
@@ -841,10 +887,9 @@
     card.classList.add("pop");
     burstStars();
 
-    window.setTimeout(() => {
-      if (!session || session.ended) return;
-      nextQuestion();
-    }, 550);
+    session.waitingNext = true;
+    setPowLabel("NEXT!");
+    setVoiceStatus("Nice! Hit NEXT! to continue");
   }
 
   function burstStars() {
@@ -1032,6 +1077,7 @@
 
   function submitAnswer(guess) {
     if (!session || session.ended || !session.current) return;
+    if (session.waitingNext) return;
     if (session.accepting === false) return;
 
     guess = Number(guess);
@@ -1044,7 +1090,6 @@
     else {
       onWrong();
       $("answer").value = "";
-      if (!state.settings.voiceMode) $("answer").focus();
     }
   }
 
@@ -1063,7 +1108,7 @@
       digitLevel: $("digit-level")?.value || "single",
       mode: $("mode")?.value || "endless",
       shuffle: !!$("shuffle")?.checked,
-      voiceMode: !!$("voice-mode")?.checked,
+      voiceMode: true,
       tables,
       problemType: $("problem-type")?.value || "product",
     });
@@ -1104,11 +1149,19 @@
   $("answer-form").addEventListener("submit", (e) => {
     e.preventDefault();
     if (!session || session.ended || !session.current) return;
+
+    // After a correct answer, POW becomes NEXT!
+    if (session.waitingNext) {
+      session.waitingNext = false;
+      nextQuestion();
+      return;
+    }
+
     if (session.accepting === false) return;
 
     const raw = String($("answer").value || "").replace(/[^\d]/g, "");
     if (!raw) {
-      $("feedback").textContent = "Type a number or tap SAY IT";
+      $("feedback").textContent = "Say or type a number, then hit POW!";
       $("feedback").className = "feedback wrong";
       return;
     }
@@ -1117,9 +1170,10 @@
   });
 
   $("btn-mic")?.addEventListener("click", () => {
+    if (session?.waitingNext) return;
     if (listening) {
       stopListening();
-      setVoiceStatus("Mic off");
+      setVoiceStatus("Mic paused — tap to listen again");
       return;
     }
     startListening();
