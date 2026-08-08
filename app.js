@@ -53,6 +53,7 @@
    *  mode: string,
    *  shuffle: boolean,
    *  tables: number[],
+   *  problemType: string,
    *  max: number,
    *  asked: number,
    *  target: number | null,
@@ -60,7 +61,7 @@
    *  firstTryCorrect: number,
    *  attemptsOnCurrent: number,
    *  sessionStars: number,
-   *  current: {a:number,b:number,key:string} | null,
+   *  current: {a:number,b:number,key:string,promptType:string,expected:number,display:string} | null,
    *  ended: boolean,
    *  timerId: number | null,
    *  timeLeft: number,
@@ -90,6 +91,7 @@
         mode: "endless",
         shuffle: true,
         tables: rangeTables(10),
+        problemType: "product",
       },
     };
   }
@@ -177,6 +179,7 @@
     $("stat-level").textContent = String(levelFromStars(state.stars));
     $("difficulty").value = state.settings.difficulty;
     $("mode").value = state.settings.mode;
+    $("problem-type").value = state.settings.problemType || "product";
     $("shuffle").checked = !!state.settings.shuffle;
     renderTableChips();
     updateHeroAvatar();
@@ -290,6 +293,34 @@
     return { a: last.a, b: last.b, key: last.key };
   }
 
+  function choosePromptType(problemType) {
+    if (problemType === "mix") {
+      const kinds = ["product", "missing-b", "missing-a"];
+      return kinds[Math.floor(Math.random() * kinds.length)];
+    }
+    return problemType || "product";
+  }
+
+  function formatProblem(a, b, promptType) {
+    const product = a * b;
+    if (promptType === "missing-b") {
+      return {
+        display: `${a} × ____ = ${product}`,
+        expected: b,
+      };
+    }
+    if (promptType === "missing-a") {
+      return {
+        display: `____ × ${b} = ${product}`,
+        expected: a,
+      };
+    }
+    return {
+      display: `${a} × ${b} = ____`,
+      expected: product,
+    };
+  }
+
   function startMission(opts) {
     stopTimer();
     const max = DIFFICULTY[opts.difficulty] || 10;
@@ -297,12 +328,14 @@
       .map(Number)
       .filter((n) => n >= 1 && n <= max);
     if (!tables.length) tables = rangeTables(max);
+    const problemType = opts.problemType || "product";
 
     session = {
       difficulty: opts.difficulty,
       mode: opts.mode,
       shuffle: opts.shuffle,
       tables,
+      problemType,
       max,
       asked: 0,
       target: opts.mode === "10" || opts.mode === "20" ? Number(opts.mode) : null,
@@ -321,6 +354,7 @@
       mode: opts.mode,
       shuffle: opts.shuffle,
       tables,
+      problemType,
     };
     saveState();
 
@@ -363,11 +397,21 @@
       return;
     }
 
-    session.current = pickQuestion(session.max, session.shuffle, session.tables);
+    const picked = pickQuestion(session.max, session.shuffle, session.tables);
+    const promptType = choosePromptType(session.problemType);
+    const formatted = formatProblem(picked.a, picked.b, promptType);
+    session.current = {
+      ...picked,
+      promptType,
+      expected: formatted.expected,
+      display: formatted.display,
+    };
     session.attemptsOnCurrent = 0;
     session.asked += 1;
 
-    $("problem-text").textContent = `${session.current.a} × ${session.current.b}`;
+    const problemEl = $("problem-text");
+    problemEl.textContent = session.current.display;
+    problemEl.classList.toggle("equation", true);
     $("answer").value = "";
     $("feedback").textContent = "";
     $("feedback").className = "feedback";
@@ -618,6 +662,7 @@
       mode: $("mode").value,
       shuffle: $("shuffle").checked,
       tables,
+      problemType: $("problem-type").value,
     });
   });
 
@@ -653,7 +698,7 @@
     }
 
     const guess = Number(raw);
-    const expected = session.current.a * session.current.b;
+    const expected = session.current.expected;
     session.attemptsOnCurrent += 1;
 
     if (guess === expected) onCorrect();
@@ -680,6 +725,7 @@
       mode: state.settings.mode,
       shuffle: state.settings.shuffle,
       tables: state.settings.tables,
+      problemType: state.settings.problemType || "product",
     });
   });
 
