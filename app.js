@@ -307,6 +307,20 @@
     if (btn) btn.textContent = text;
   }
 
+  function focusAnswer() {
+    const input = $("answer");
+    if (!input) return;
+    // Slight delay helps iPad/Safari apply focus after UI updates
+    window.setTimeout(() => {
+      input.focus({ preventScroll: false });
+      try {
+        input.select();
+      } catch {
+        /* ignore */
+      }
+    }, 50);
+  }
+
   function rangeTables(max) {
     return Array.from({ length: max }, (_, i) => i + 1);
   }
@@ -811,8 +825,7 @@
       $("play-progress").textContent = `Q ${session.asked}`;
     }
 
-    // Keep typing ready; don't force keyboard open so mic stays easy on iPad
-    // Kids can tap the box anytime to type.
+    focusAnswer();
   }
 
   function onWrong() {
@@ -841,6 +854,7 @@
     state.totalAttempts += 1;
     saveState();
     maybeAutoListen();
+    focusAnswer();
   }
 
   function onCorrect() {
