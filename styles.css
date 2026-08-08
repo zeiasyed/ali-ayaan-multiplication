@@ -23,30 +23,28 @@ html, body {
   min-height: 100%;
   font-family: var(--font-body);
   color: var(--ink);
-  background: var(--sky-mid);
+  background-color: #1a2744;
 }
 
 body {
   min-height: 100dvh;
   overflow-x: hidden;
-}
-
-.sky {
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  background-color: #1a2744;
   background-image:
     linear-gradient(
       180deg,
-      rgba(15, 28, 55, 0.55) 0%,
-      rgba(20, 40, 70, 0.45) 40%,
-      rgba(255, 180, 80, 0.35) 100%
+      rgba(10, 20, 40, 0.28) 0%,
+      rgba(10, 20, 40, 0.18) 45%,
+      rgba(255, 160, 60, 0.22) 100%
     ),
     url("bg-spiderman.png");
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
+  background-attachment: scroll;
+}
+
+.sky {
+  display: none;
 }
 
 .burst {
@@ -54,6 +52,8 @@ body {
 }
 
 .app {
+  position: relative;
+  z-index: 1;
   width: min(820px, 100%);
   margin: 0 auto;
   padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem max(2.5rem, env(safe-area-inset-bottom));
