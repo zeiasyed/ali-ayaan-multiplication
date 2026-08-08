@@ -51,6 +51,16 @@
           </select>
         </label>
 
+        <fieldset class="table-picker">
+          <legend>Practice tables</legend>
+          <p class="table-hint">Pick which times tables to drill (e.g. 2×, 7×)</p>
+          <div class="table-actions">
+            <button type="button" class="btn-link" id="tables-all">All</button>
+            <button type="button" class="btn-link" id="tables-none">None</button>
+          </div>
+          <div id="table-chips" class="table-chips" role="group" aria-label="Times tables"></div>
+        </fieldset>
+
         <label>
           Mission mode
           <select id="mode" name="mode">

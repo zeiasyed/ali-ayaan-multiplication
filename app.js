@@ -52,6 +52,7 @@
    *  difficulty: string,
    *  mode: string,
    *  shuffle: boolean,
+   *  tables: number[],
    *  max: number,
    *  asked: number,
    *  target: number | null,
@@ -67,6 +68,10 @@
   let session = null;
 
   const $ = (id) => document.getElementById(id);
+
+  function rangeTables(max) {
+    return Array.from({ length: max }, (_, i) => i + 1);
+  }
 
   function defaultState() {
     return {
@@ -84,6 +89,7 @@
         difficulty: "medium",
         mode: "endless",
         shuffle: true,
+        tables: rangeTables(10),
       },
     };
   }
@@ -92,7 +98,27 @@
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return defaultState();
-      return { ...defaultState(), ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      const base = defaultState();
+      const merged = {
+        ...base,
+        ...parsed,
+        settings: {
+          ...base.settings,
+          ...(parsed.settings || {}),
+        },
+        facts: parsed.facts || {},
+        badges: parsed.badges || {},
+        unlockedHeroes: { ...base.unlockedHeroes, ...(parsed.unlockedHeroes || {}) },
+      };
+      if (!Array.isArray(merged.settings.tables) || !merged.settings.tables.length) {
+        const max = DIFFICULTY[merged.settings.difficulty] || 10;
+        merged.settings.tables = rangeTables(max);
+      }
+      merged.settings.tables = merged.settings.tables
+        .map(Number)
+        .filter((n) => n >= 1 && n <= 15);
+      return merged;
     } catch {
       return defaultState();
     }
@@ -152,7 +178,45 @@
     $("difficulty").value = state.settings.difficulty;
     $("mode").value = state.settings.mode;
     $("shuffle").checked = !!state.settings.shuffle;
+    renderTableChips();
     updateHeroAvatar();
+  }
+
+  function currentMax() {
+    return DIFFICULTY[$("difficulty")?.value || state.settings.difficulty] || 10;
+  }
+
+  function getSelectedTables() {
+    const chips = [...document.querySelectorAll(".table-chip[aria-pressed='true']")];
+    return chips.map((btn) => Number(btn.dataset.table)).filter(Boolean);
+  }
+
+  function renderTableChips() {
+    const max = currentMax();
+    const host = $("table-chips");
+    const selected = new Set(
+      (state.settings.tables || [])
+        .map(Number)
+        .filter((n) => n >= 1 && n <= max)
+    );
+    if (!selected.size) {
+      rangeTables(max).forEach((n) => selected.add(n));
+    }
+
+    host.innerHTML = "";
+    for (let n = 1; n <= max; n++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "table-chip";
+      btn.dataset.table = String(n);
+      btn.textContent = `${n}×`;
+      btn.setAttribute("aria-pressed", selected.has(n) ? "true" : "false");
+      btn.addEventListener("click", () => {
+        const on = btn.getAttribute("aria-pressed") === "true";
+        btn.setAttribute("aria-pressed", on ? "false" : "true");
+      });
+      host.appendChild(btn);
+    }
   }
 
   function updateHeroAvatar() {
@@ -178,33 +242,41 @@
     }
   }
 
-  function buildPool(max) {
+  function buildPool(max, tables) {
+    const focus = (tables && tables.length ? tables : rangeTables(max))
+      .map(Number)
+      .filter((n) => n >= 1 && n <= max);
     const pool = [];
-    for (let a = 1; a <= max; a++) {
+    const seen = new Set();
+
+    for (const a of focus) {
       for (let b = 1; b <= max; b++) {
         const key = factKey(a, b);
+        if (seen.has(`${a}:${b}`)) continue;
+        seen.add(`${a}:${b}`);
         const fact = ensureFact(key);
         const weight = fact.mastered ? 0.35 : Math.max(1, fact.weight);
+        // Keep selected table as the first factor for clarity (7 × 3)
         pool.push({ a, b, key, weight });
       }
     }
     return pool;
   }
 
-  function pickQuestion(max, shuffle) {
-    const pool = buildPool(max);
+  function pickQuestion(max, shuffle, tables) {
+    const pool = buildPool(max, tables);
+    if (!pool.length) return { a: 1, b: 1, key: factKey(1, 1) };
+
     if (!shuffle) {
-      // Sequential-ish: prefer lower tables / unmastered, but still weight misses
       pool.sort((x, y) => {
         if (x.a !== y.a) return x.a - y.a;
         return x.b - y.b;
       });
     }
 
-    // Avoid immediate repeat when possible
     const filtered =
       session?.current && pool.length > 1
-        ? pool.filter((p) => p.key !== session.current.key || p.weight > 3)
+        ? pool.filter((p) => !(p.a === session.current.a && p.b === session.current.b) || p.weight > 3)
         : pool;
 
     const use = filtered.length ? filtered : pool;
@@ -221,13 +293,16 @@
   function startMission(opts) {
     stopTimer();
     const max = DIFFICULTY[opts.difficulty] || 10;
-    const target =
-      opts.mode === "10" ? 10 : opts.mode === "20" ? 20 : opts.mode === "timed" ? null : null;
+    let tables = (opts.tables || [])
+      .map(Number)
+      .filter((n) => n >= 1 && n <= max);
+    if (!tables.length) tables = rangeTables(max);
 
     session = {
       difficulty: opts.difficulty,
       mode: opts.mode,
       shuffle: opts.shuffle,
+      tables,
       max,
       asked: 0,
       target: opts.mode === "10" || opts.mode === "20" ? Number(opts.mode) : null,
@@ -245,6 +320,7 @@
       difficulty: opts.difficulty,
       mode: opts.mode,
       shuffle: opts.shuffle,
+      tables,
     };
     saveState();
 
@@ -287,7 +363,7 @@
       return;
     }
 
-    session.current = pickQuestion(session.max, session.shuffle);
+    session.current = pickQuestion(session.max, session.shuffle, session.tables);
     session.attemptsOnCurrent = 0;
     session.asked += 1;
 
@@ -503,6 +579,7 @@
           <li>Facts mastered: ${mastered}</li>
           <li>Lifetime accuracy: ${accuracy}%</li>
           <li>Hero level: ${levelFromStars(state.stars)}</li>
+          <li>Focus tables: ${(state.settings.tables || []).map((n) => `${n}×`).join(", ") || "all"}</li>
         </ul>
       </div>
       <div class="parent-card">
@@ -531,10 +608,36 @@
   // Events
   $("setup-form").addEventListener("submit", (e) => {
     e.preventDefault();
+    const tables = getSelectedTables();
+    if (!tables.length) {
+      alert("Pick at least one times table (like 2× or 7×).");
+      return;
+    }
     startMission({
       difficulty: $("difficulty").value,
       mode: $("mode").value,
       shuffle: $("shuffle").checked,
+      tables,
+    });
+  });
+
+  $("difficulty").addEventListener("change", () => {
+    const max = currentMax();
+    // Keep overlapping selections when difficulty changes
+    state.settings.tables = getSelectedTables().filter((n) => n <= max);
+    if (!state.settings.tables.length) state.settings.tables = rangeTables(max);
+    renderTableChips();
+  });
+
+  $("tables-all").addEventListener("click", () => {
+    document.querySelectorAll(".table-chip").forEach((btn) => {
+      btn.setAttribute("aria-pressed", "true");
+    });
+  });
+
+  $("tables-none").addEventListener("click", () => {
+    document.querySelectorAll(".table-chip").forEach((btn) => {
+      btn.setAttribute("aria-pressed", "false");
     });
   });
 
@@ -576,6 +679,7 @@
       difficulty: state.settings.difficulty,
       mode: state.settings.mode,
       shuffle: state.settings.shuffle,
+      tables: state.settings.tables,
     });
   });
 
