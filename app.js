@@ -214,7 +214,7 @@
     if (btn) {
       btn.classList.toggle("listening", on);
       btn.setAttribute("aria-pressed", on ? "true" : "false");
-      btn.textContent = on ? "Listening… just talk" : "Mic paused — tap to listen";
+      btn.textContent = on ? "Mic on — just talk" : "Mic paused — tap to listen";
     }
   }
 

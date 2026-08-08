@@ -490,22 +490,18 @@ select, input[type="text"] {
 
 #answer-form .btn.say-it {
   width: 100%;
-  min-height: 4.2rem;
-  font-size: clamp(1.35rem, 4vw, 1.7rem);
-  letter-spacing: 0.06em;
-  background: var(--gold);
-  color: var(--ink);
+  min-height: 3.2rem;
+  font-size: clamp(1rem, 3vw, 1.2rem);
+  letter-spacing: 0.02em;
+  background: #fff;
+  color: var(--muted);
+  box-shadow: 2px 2px 0 var(--ink);
 }
 
 #answer-form .btn.say-it.listening {
-  background: var(--red);
-  color: #fff;
-  animation: pulse-mic 1s ease-in-out infinite;
-}
-
-@keyframes pulse-mic {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.03); }
+  background: #fff;
+  color: var(--muted);
+  animation: none;
 }
 
 .voice-status {
