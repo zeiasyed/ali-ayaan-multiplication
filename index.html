@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css?v=12" />
+  <link rel="stylesheet" href="styles.css?v=13" />
 </head>
 <body>
   <div class="sky" aria-hidden="true"></div>
@@ -115,8 +115,8 @@
         </label>
 
         <label class="toggle-row">
-          <span>Say answers out loud</span>
-          <input type="checkbox" id="voice-mode" />
+          <span>Auto-listen each question</span>
+          <input type="checkbox" id="voice-mode" checked />
           <span class="switch" aria-hidden="true"></span>
         </label>
 
@@ -125,6 +125,7 @@
           <input type="checkbox" id="shuffle" checked />
           <span class="switch" aria-hidden="true"></span>
         </label>
+        <p class="setup-note">Answers can always be typed or spoken with 🎤</p>
 
         <button type="submit" class="btn primary big">Start Mission</button>
       </form>
@@ -154,7 +155,7 @@
 
       <div class="problem-card" id="problem-card">
         <p class="problem equation" id="problem-text">3 × 4 = ?</p>
-        <p class="problem-hint" id="problem-hint">Type the answer</p>
+        <p class="problem-hint" id="problem-hint">Type it or tap 🎤 and say it</p>
         <form id="answer-form" autocomplete="off">
           <label class="sr-only" for="answer">Your answer</label>
           <input
@@ -231,6 +232,6 @@
   </div>
 
   <div id="fx" class="fx" aria-hidden="true"></div>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

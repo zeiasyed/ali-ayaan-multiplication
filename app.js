@@ -298,7 +298,7 @@
         digitLevel: "single",
         mode: "endless",
         shuffle: true,
-        voiceMode: false,
+        voiceMode: true,
         tables: rangeTables(10),
         problemType: "product",
       },
@@ -619,20 +619,20 @@
       return {
         display: `${a} ${sym} ${blank} = ${result}`,
         expected: b,
-        hint: "Fill in the missing number",
+        hint: "Fill in the missing number — type it or say it",
       };
     }
     if (promptType === "missing-a") {
       return {
         display: `${blank} ${sym} ${b} = ${result}`,
         expected: a,
-        hint: "Fill in the missing number",
+        hint: "Fill in the missing number — type it or say it",
       };
     }
     return {
       display: `${a} ${sym} ${b} = ${blank}`,
       expected: result,
-      hint: "Type or say the answer",
+      hint: "Type it or tap 🎤 and say it",
     };
   }
 
@@ -747,16 +747,14 @@
     problemEl.classList.toggle("equation", true);
     const hintEl = $("problem-hint");
     if (hintEl) {
-      hintEl.textContent = state.settings.voiceMode
-        ? "Say the number out loud (or type it)"
-        : session.current.hint || "Type or say the answer";
+      hintEl.textContent = "Type it or tap 🎤 and say it";
     }
     $("answer").value = "";
     $("feedback").textContent = "";
     $("feedback").className = "feedback";
     $("problem-card").classList.remove("shake", "pop");
     stopListening();
-    setVoiceStatus(state.settings.voiceMode ? "Get ready…" : "");
+    setVoiceStatus("");
     maybeAutoListen();
 
     if (session.target != null) {
@@ -767,7 +765,8 @@
       $("play-progress").textContent = `Q ${session.asked}`;
     }
 
-    if (!state.settings.voiceMode) $("answer").focus();
+    // Keep typing ready; don't force keyboard open so mic stays easy on iPad
+    // Kids can tap the box anytime to type.
   }
 
   function onWrong() {

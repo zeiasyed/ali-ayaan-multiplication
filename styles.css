@@ -499,6 +499,13 @@ select, input[type="text"] {
   color: var(--blue);
 }
 
+.setup-note {
+  margin: -0.25rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 .feedback {
   min-height: 1.5em;
   margin: 0.85rem 0 0;
