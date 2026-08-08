@@ -10,12 +10,51 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <link rel="stylesheet" href="styles.css?v=19" />
+  <link rel="stylesheet" href="styles-v20.css" />
+  <style>
+    /* Inline so a cached old styles.css can't hide the background */
+    html, body {
+      background-color: #1a2744 !important;
+    }
+    .page-bg {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+      object-position: center top !important;
+      z-index: 0 !important;
+      pointer-events: none !important;
+    }
+    .page-bg::after { content: none; }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        180deg,
+        rgba(10, 20, 40, 0.25) 0%,
+        rgba(10, 20, 40, 0.15) 45%,
+        rgba(255, 160, 60, 0.2) 100%
+      );
+    }
+    .sky, .burst { display: none !important; }
+    .app { position: relative; z-index: 1; }
+  </style>
 </head>
 <body>
+  <img
+    class="page-bg"
+    src="bg-spiderman.png"
+    alt=""
+    aria-hidden="true"
+    decoding="async"
+  />
   <div class="sky" aria-hidden="true"></div>
   <div class="burst" aria-hidden="true"></div>
 
@@ -239,6 +278,6 @@
   </div>
 
   <div id="fx" class="fx" aria-hidden="true"></div>
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>
